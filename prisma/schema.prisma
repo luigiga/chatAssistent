@@ -1,0 +1,139 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Entidade de Usuário
+model User {
+  id            String   @id @default(uuid())
+  email          String   @unique
+  passwordHash   String   @map("password_hash")
+  name           String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relações
+  tasks          Task[]
+  notes          Note[]
+  reminders      Reminder[]
+  refreshTokens  RefreshToken[]
+  auditLogs      AuditLog[]
+  aiInteractions AIInteraction[]
+
+  @@map("users")
+}
+
+// Token de Refresh para autenticação rotacionável
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// Tarefa
+model Task {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  title       String
+  description String?
+  completed   Boolean  @default(false)
+  dueDate     DateTime? @map("due_date")
+  priority    String?  // 'low', 'medium', 'high'
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, completed])
+  @@map("tasks")
+}
+
+// Nota
+model Note {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  title     String?
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notes")
+}
+
+// Lembrete
+model Reminder {
+  id          String   @id @default(uuid())
+  userId       String   @map("user_id")
+  title        String
+  description  String?
+  reminderDate DateTime @map("reminder_date")
+  isRecurring  Boolean  @default(false) @map("is_recurring")
+  recurrenceRule String? @map("recurrence_rule") // Ex: "daily", "weekly", "monthly"
+  completed    Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  completedAt  DateTime? @map("completed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, reminderDate])
+  @@map("reminders")
+}
+
+// Log de auditoria
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  action    String   // Ex: "task.created", "task.completed", "note.deleted"
+  entityType String  @map("entity_type") // Ex: "Task", "Note", "Reminder"
+  entityId  String?  @map("entity_id")
+  metadata  String?  // JSON com dados adicionais
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+// Interações com IA (para persistir histórico)
+model AIInteraction {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  userInput       String   @map("user_input")
+  aiResponse      String   @map("ai_response") // JSON da resposta da IA
+  needsConfirmation Boolean @default(false) @map("needs_confirmation")
+  confirmed       Boolean? // null = pendente, true = confirmado, false = rejeitado
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("ai_interactions")
+}
+
