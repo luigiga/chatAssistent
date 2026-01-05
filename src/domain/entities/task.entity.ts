@@ -61,6 +61,36 @@ export class Task {
   }
 
   /**
+   * Reconstrói uma Task a partir de dados persistidos
+   * Usado pelos repositórios para reconstruir entidades do banco
+   */
+  static fromPersistence(
+    id: string,
+    userId: string,
+    title: string,
+    description: string | undefined,
+    completed: boolean,
+    dueDate: Date | undefined,
+    priority: TaskPriority | undefined,
+    createdAt: Date | undefined,
+    updatedAt: Date | undefined,
+    completedAt: Date | undefined,
+  ): Task {
+    return new Task(
+      id,
+      userId,
+      title,
+      description,
+      completed,
+      dueDate,
+      priority,
+      createdAt,
+      updatedAt,
+      completedAt,
+    );
+  }
+
+  /**
    * Valida o título da tarefa
    * @throws Error se o título for inválido
    */

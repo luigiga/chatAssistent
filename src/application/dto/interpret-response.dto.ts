@@ -18,5 +18,13 @@ export interface InterpretResponseDto {
    * Indica se a ação foi executada automaticamente
    */
   executed: boolean;
+
+  /**
+   * Entidade criada automaticamente (se executed = true)
+   */
+  createdEntity?: {
+    id: string;
+    type: 'task' | 'note' | 'reminder';
+  };
 }
 

@@ -26,7 +26,9 @@ export class RealAIProvider implements AIProvider {
   constructor(private readonly configService: ConfigService) {
     this.config = {
       apiKey: this.configService.get<string>('AI_API_KEY') || '',
-      apiUrl: this.configService.get<string>('AI_API_URL') || 'https://api.openai.com/v1/chat/completions',
+      apiUrl:
+        this.configService.get<string>('AI_API_URL') ||
+        'https://api.openai.com/v1/chat/completions',
       model: this.configService.get<string>('AI_MODEL') || 'gpt-3.5-turbo',
       maxTokens: parseInt(this.configService.get<string>('AI_MAX_TOKENS') || '500', 10),
       timeout: parseInt(this.configService.get<string>('AI_TIMEOUT') || '30000', 10),
@@ -41,7 +43,9 @@ export class RealAIProvider implements AIProvider {
   async interpret(userInput: string): Promise<AIInterpretationResponse> {
     // Validar tamanho do input
     if (userInput.length > this.config.maxInputLength) {
-      this.logger.warn(`Input muito longo: ${userInput.length} caracteres. Limitando para ${this.config.maxInputLength}.`);
+      this.logger.warn(
+        `Input muito longo: ${userInput.length} caracteres. Limitando para ${this.config.maxInputLength}.`,
+      );
       userInput = userInput.slice(0, this.config.maxInputLength);
     }
 
@@ -53,9 +57,11 @@ export class RealAIProvider implements AIProvider {
     try {
       // Construir prompt
       const prompt = buildPrompt(userInput);
-      
+
       // Log do prompt (sem dados sensíveis)
-      this.logger.debug(`Chamando IA com modelo: ${this.config.model}, input length: ${userInput.length}`);
+      this.logger.debug(
+        `Chamando IA com modelo: ${this.config.model}, input length: ${userInput.length}`,
+      );
 
       // Chamar API da IA
       const aiResponseRaw = await this.callAI(prompt);
@@ -69,8 +75,10 @@ export class RealAIProvider implements AIProvider {
       // Mapear para formato do domínio
       return mapAIResponseToDomain(validatedResponse);
     } catch (error) {
-      this.logger.error(`Erro ao chamar IA: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-      
+      this.logger.error(
+        `Erro ao chamar IA: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+      );
+
       // Em caso de erro, retornar unknown com confirmação
       return {
         needs_confirmation: true,
@@ -93,14 +101,15 @@ export class RealAIProvider implements AIProvider {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
+          Authorization: `Bearer ${this.config.apiKey}`,
         },
         body: JSON.stringify({
           model: this.config.model,
           messages: [
             {
               role: 'system',
-              content: 'Você é um assistente que retorna APENAS JSON válido, sem markdown, sem explicações.',
+              content:
+                'Você é um assistente que retorna APENAS JSON válido, sem markdown, sem explicações.',
             },
             {
               role: 'user',
@@ -118,6 +127,22 @@ export class RealAIProvider implements AIProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
+        let errorData: any = {};
+
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          // Se não conseguir parsear, usar texto como está
+        }
+
+        // Detectar erro de quota especificamente
+        if (response.status === 429) {
+          const errorCode = errorData?.error?.code || '';
+          if (errorCode === 'insufficient_quota' || errorCode === 'rate_limit_exceeded') {
+            throw new Error('QUOTA_EXCEEDED');
+          }
+        }
+
         throw new Error(`API da IA retornou erro ${response.status}: ${errorText}`);
       }
 
@@ -136,16 +161,15 @@ export class RealAIProvider implements AIProvider {
       return data;
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
           throw new Error(`Timeout ao chamar IA (${this.config.timeout}ms)`);
         }
         throw error;
       }
-      
+
       throw new Error('Erro desconhecido ao chamar IA');
     }
   }
 }
-

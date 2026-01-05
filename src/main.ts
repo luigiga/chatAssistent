@@ -10,9 +10,16 @@ import { ZodExceptionFilter } from './api/filters/zod-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Processar CORS_ORIGIN - pode ser string única ou múltiplas separadas por vírgula
+  const corsOriginEnv = process.env.CORS_ORIGIN || 'http://localhost:5173';
+  const allowedOrigins = corsOriginEnv
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
   // Habilitar CORS
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins,
     credentials: true,
   });
 

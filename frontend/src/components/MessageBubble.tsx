@@ -1,109 +1,103 @@
 /**
- * Balão de mensagem (usuário ou assistente)
+ * Balão de memória (usuário ou assistente)
  */
 import { LoadingIndicator } from './LoadingIndicator';
-import type { InterpretResponse } from '../services/api';
+import { ActionCard } from './ActionCard';
+import type { MemoryInterpretationResponse } from '../services/api';
 
 export type MemoryEntryType = 'user' | 'assistant' | 'error' | 'loading';
 
 interface MemoryEntryProps {
   type: MemoryEntryType;
   content?: string;
-  interpretation?: InterpretResponse['interpretation'];
+  interpretation?: MemoryInterpretationResponse['interpretation'];
+  interactionId?: string;
+  needsConfirmation?: boolean;
+  onConfirm?: (interactionId: string) => void;
+  onReject?: (interactionId: string) => void;
+  isConfirming?: boolean;
+  timestamp?: Date;
 }
 
-function formatInterpretation(interpretation: InterpretResponse['interpretation']): string {
-  const parts: string[] = [];
-
-  if (interpretation.action_type === 'task' && interpretation.task) {
-    parts.push(`📋 Tarefa: ${interpretation.task.title}`);
-    if (interpretation.task.description) {
-      parts.push(`   ${interpretation.task.description}`);
-    }
-    if (interpretation.task.due_date) {
-      const date = new Date(interpretation.task.due_date);
-      parts.push(`   📅 Prazo: ${date.toLocaleDateString('pt-BR')}`);
-    }
-    if (interpretation.task.priority) {
-      const priorityLabels = { low: 'Baixa', medium: 'Média', high: 'Alta' };
-      parts.push(`   ⚡ Prioridade: ${priorityLabels[interpretation.task.priority]}`);
-    }
-  } else if (interpretation.action_type === 'note' && interpretation.note) {
-    parts.push(`📝 Nota: ${interpretation.note.title || 'Sem título'}`);
-    if (interpretation.note.content) {
-      parts.push(`   ${interpretation.note.content}`);
-    }
-  } else if (interpretation.action_type === 'reminder' && interpretation.reminder) {
-    parts.push(`⏰ Lembrete: ${interpretation.reminder.title}`);
-    if (interpretation.reminder.description) {
-      parts.push(`   ${interpretation.reminder.description}`);
-    }
-    if (interpretation.reminder.reminder_date) {
-      const date = new Date(interpretation.reminder.reminder_date);
-      parts.push(`   📅 Data: ${date.toLocaleDateString('pt-BR')} ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
-    }
-    if (interpretation.reminder.is_recurring) {
-      parts.push(`   🔄 Recorrente: ${interpretation.reminder.recurrence_rule || 'Sim'}`);
-    }
-  } else if (interpretation.action_type === 'unknown') {
-    parts.push('❓ Não consegui interpretar sua entrada.');
-    if (interpretation.confirmation_message) {
-      parts.push(`   ${interpretation.confirmation_message}`);
-    }
-  }
-
-  if (interpretation.needs_confirmation && interpretation.confirmation_message) {
-    parts.push(`\n⚠️ ${interpretation.confirmation_message}`);
-  }
-
-  return parts.join('\n');
-}
-
-export function MessageBubble({ type, content, interpretation }: MemoryEntryProps) {
+export function MessageBubble({
+  type,
+  content,
+  interpretation,
+  interactionId,
+  needsConfirmation,
+  onConfirm,
+  onReject,
+  isConfirming = false,
+  timestamp,
+}: MemoryEntryProps) {
   if (type === 'loading') {
     return (
-      <div className="flex justify-start mb-4">
-        <div className="max-w-[80%] bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-          <LoadingIndicator />
-        </div>
+      <div className="flex items-center gap-2 py-2">
+        <LoadingIndicator />
       </div>
     );
   }
 
+  // Tipo 'error' não deve mais ser usado - sempre salvar como memória
+  // Mantido apenas para compatibilidade, mas não deve aparecer
   if (type === 'error') {
+    // Transformar erro em confirmação neutra
     return (
-      <div className="flex justify-start mb-4">
-        <div className="max-w-[80%] bg-red-50 border border-red-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-          <p className="text-red-700 text-sm">❌ {content || 'Erro ao processar entrada'}</p>
-        </div>
+      <div className="py-1">
+        <p className="text-text-secondary text-xs whitespace-pre-wrap break-words">
+          Registro salvo.
+        </p>
       </div>
     );
   }
 
   if (type === 'user') {
+    // Entrada do usuário como registro de pensamento, não mensagem de chat
+    const timeStr = timestamp
+      ? timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      : '';
+    
     return (
-      <div className="flex justify-end mb-4">
-        <div className="max-w-[80%] bg-blue-soft rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm">
-          <p className="text-text-primary text-sm whitespace-pre-wrap break-words">
+      <div className="flex items-start gap-3">
+        {/* Indicador de registro */}
+        <div className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-primary mt-1.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-text-primary text-sm leading-relaxed whitespace-pre-wrap break-words">
             {content}
           </p>
+          {timeStr && (
+            <p className="text-text-secondary/60 text-xs mt-1">
+              {timeStr}
+            </p>
+          )}
         </div>
       </div>
     );
   }
 
-  // type === 'assistant'
-  const displayContent = interpretation
-    ? formatInterpretation(interpretation)
-    : content || '';
-
-  return (
-    <div className="flex justify-start mb-4">
-      <div className="max-w-[80%] bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-        <p className="text-text-primary text-sm whitespace-pre-wrap break-words">
-          {displayContent}
-        </p>
+  // type === 'assistant' - mostrar cartão de ação se tiver interpretação
+  // Card de ação é o elemento principal, sem padding extra
+  if (interpretation) {
+    return (
+      <div>
+        <ActionCard
+          interpretation={interpretation}
+          needsConfirmation={needsConfirmation}
+          interactionId={interactionId}
+          onConfirm={onConfirm}
+          onReject={onReject}
+          isConfirming={isConfirming}
+        />
       </div>
+    );
+  }
+
+  // Fallback para conteúdo simples (confirmações silenciosas)
+  return (
+    <div className="py-1">
+      <p className="text-text-secondary text-xs whitespace-pre-wrap break-words">
+        {content || ''}
+      </p>
     </div>
   );
 }

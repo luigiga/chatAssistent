@@ -8,7 +8,7 @@ export function LoadingState() {
         <div className="w-12 h-12 border-4 border-blue-soft border-t-blue-primary rounded-full animate-spin"></div>
       </div>
       <p className="mt-4 text-text-secondary text-sm font-medium">
-        Processando sua mensagem...
+        Organizando seus pensamentos...
       </p>
     </div>
   );

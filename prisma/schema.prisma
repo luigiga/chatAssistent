@@ -26,6 +26,7 @@ model User {
   refreshTokens  RefreshToken[]
   auditLogs      AuditLog[]
   aiInteractions AIInteraction[]
+  aiQuotaUsage   AIQuotaUsage[]
 
   @@map("users")
 }
@@ -135,5 +136,21 @@ model AIInteraction {
   @@index([userId])
   @@index([userId, createdAt])
   @@map("ai_interactions")
+}
+
+// Controle de Quota de IA por Usuário
+model AIQuotaUsage {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  date         DateTime @default(now())
+  requestCount Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("ai_quota_usage")
 }
 

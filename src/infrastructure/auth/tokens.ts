@@ -7,4 +7,8 @@ export const PASSWORD_HASHER = Symbol('PasswordHasher');
 export const JWT_SERVICE = Symbol('JwtService');
 export const AI_PROVIDER = Symbol('AIProvider');
 export const AI_INTERACTION_REPOSITORY = Symbol('AIInteractionRepository');
+export const TASK_REPOSITORY = Symbol('TaskRepository');
+export const NOTE_REPOSITORY = Symbol('NoteRepository');
+export const REMINDER_REPOSITORY = Symbol('ReminderRepository');
+export const AI_QUOTA_USAGE_REPOSITORY = Symbol('AIQuotaUsageRepository');
 

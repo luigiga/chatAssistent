@@ -1,17 +1,37 @@
 /**
- * Barra de entrada de mensagem fixa na parte inferior
+ * Campo de captura de pensamento
+ * Design minimalista para registro de memórias, não conversa
  */
-import { useState, KeyboardEvent } from 'react';
+import { Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import type { KeyboardEvent } from 'react';
 
 interface MemoryInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  initialValue?: string;
+  highlight?: boolean;
 }
 
-export function MessageInput({ onSend, disabled }: MemoryInputProps) {
-  const [input, setInput] = useState('');
+export function MessageInput({ onSend, disabled, initialValue = '', highlight = false }: MemoryInputProps) {
+  const [input, setInput] = useState(initialValue);
+  const [isHighlighted, setIsHighlighted] = useState(false);
 
-  const handleSend = () => {
+  // Sincronizar com initialValue quando mudar externamente
+  useEffect(() => {
+    setInput(initialValue);
+  }, [initialValue]);
+
+  // Efeito de destaque sutil após criação de memória
+  useEffect(() => {
+    if (highlight) {
+      setIsHighlighted(true);
+      const timer = setTimeout(() => setIsHighlighted(false), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [highlight]);
+
+  const handleSave = () => {
     const trimmed = input.trim();
     if (trimmed && !disabled) {
       onSend(trimmed);
@@ -22,58 +42,48 @@ export function MessageInput({ onSend, disabled }: MemoryInputProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      handleSave();
     }
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border shadow-lg">
-      <div className="max-w-4xl mx-auto px-4 py-3">
-        <div className="flex items-end gap-3">
-          <div className="flex-1">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={disabled}
-              placeholder="O que você quer lembrar?"
-              rows={1}
-              className="w-full px-4 py-3 border border-border rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-primary focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed text-sm"
-              style={{
-                minHeight: '48px',
-                maxHeight: '120px',
-              }}
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement;
-                target.style.height = 'auto';
-                target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
-              }}
-            />
-          </div>
+    <div className="px-4 py-5">
+      <div className="relative flex items-end">
+        <div className="flex-1 relative">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={disabled}
+            placeholder="Digite aqui. Pode ser qualquer coisa."
+            rows={1}
+            className={`w-full px-5 py-4.5 pr-14 border-0 bg-gray-50 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-primary/20 focus:bg-white disabled:bg-gray-50 disabled:cursor-not-allowed text-base text-text-primary placeholder:text-text-secondary/45 transition-all shadow-sm ${
+              isHighlighted ? 'ring-2 ring-blue-primary/30 bg-white' : ''
+            }`}
+            style={{
+              minHeight: '64px',
+              maxHeight: '140px',
+              boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.02)',
+            }}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = 'auto';
+              target.style.height = `${Math.min(target.scrollHeight, 140)}px`;
+            }}
+          />
+          {/* Botão integrado dentro do campo - mais gesto, menos botão */}
           <button
-            onClick={handleSend}
+            onClick={handleSave}
             disabled={!input.trim() || disabled}
-            className="flex items-center justify-center w-12 h-12 bg-blue-primary text-white rounded-full hover:bg-blue-hover disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
-            aria-label="Registrar memória"
+            className="absolute right-3 bottom-3.5 flex items-center justify-center w-8 h-8 bg-blue-primary text-white rounded-xl hover:bg-blue-hover disabled:opacity-25 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
+            style={{ transitionDuration: '150ms' }}
+            aria-label="Registrar"
+            title="Registrar"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="w-5 h-5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"
-              />
-            </svg>
+            <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
           </button>
         </div>
       </div>
     </div>
   );
 }
-

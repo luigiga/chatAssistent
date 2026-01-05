@@ -1,10 +1,10 @@
 /**
  * Painel de resultado (JSON formatado)
  */
-import type { InterpretResponse } from '../services/api';
+import type { MemoryInterpretationResponse } from '../services/api';
 
 interface ResultPanelProps {
-  result: InterpretResponse;
+  result: MemoryInterpretationResponse;
 }
 
 export function ResultPanel({ result }: ResultPanelProps) {

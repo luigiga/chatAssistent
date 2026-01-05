@@ -23,7 +23,7 @@ export default {
         success: '#16A34A',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Roboto', 'system-ui', '-apple-system', 'sans-serif'],
       },
     },
   },

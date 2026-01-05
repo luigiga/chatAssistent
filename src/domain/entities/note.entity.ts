@@ -36,6 +36,21 @@ export class Note {
   }
 
   /**
+   * Reconstrói uma Note a partir de dados persistidos
+   * Usado pelos repositórios para reconstruir entidades do banco
+   */
+  static fromPersistence(
+    id: string,
+    userId: string,
+    content: string,
+    title: string | undefined,
+    createdAt: Date | undefined,
+    updatedAt: Date | undefined,
+  ): Note {
+    return new Note(id, userId, content, title, createdAt, updatedAt);
+  }
+
+  /**
    * Valida o conteúdo da nota
    * @throws Error se o conteúdo for inválido
    */
