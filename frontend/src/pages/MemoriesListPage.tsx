@@ -1,8 +1,9 @@
 /**
- * Página de Lista de Memórias
- * Extensão visual da memória do usuário - organização, calma e clareza
+ * Tela de Memórias - Lista Organizada
+ * Design iOS + Magic UI - Visual suave e organizado
  */
 import { useMemo, useRef, useEffect } from 'react';
+import { Search, Filter, Sparkles } from 'lucide-react';
 import type { MemoryEntry } from '../components/MemoryTimeline';
 import { MemoryListCard } from '../components/MemoryListCard';
 import { MemoriesEmptyState } from '../components/MemoriesEmptyState';
@@ -11,18 +12,13 @@ interface MemoriesListPageProps {
   memories: MemoryEntry[];
 }
 
-/**
- * Agrupa memórias por período simplificado para a aba Memórias
- */
 function groupMemoriesByPeriod(memories: MemoryEntry[]) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const weekStart = new Date(today);
-  weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Domingo da semana atual
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
 
   const groups: Array<{ period: string; memories: MemoryEntry[] }> = [];
-
-  // Ordenar memórias por data (mais recente primeiro)
   const sorted = [...memories].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
   const todayMemories: MemoryEntry[] = [];
@@ -52,7 +48,6 @@ function groupMemoriesByPeriod(memories: MemoryEntry[]) {
     groups.push({ period: 'Esta semana', memories: thisWeekMemories });
   }
   if (olderMemories.length > 0) {
-    // Agrupar memórias antigas por mês
     const byMonth = new Map<string, MemoryEntry[]>();
     olderMemories.forEach((memory) => {
       const monthKey = memory.timestamp.toLocaleDateString('pt-BR', {
@@ -73,10 +68,7 @@ function groupMemoriesByPeriod(memories: MemoryEntry[]) {
   return groups;
 }
 
-export function MemoriesListPage({
-  memories,
-}: MemoriesListPageProps) {
-  // Filtrar apenas memórias do assistente (ações registradas)
+export function MemoriesListPage({ memories }: MemoriesListPageProps) {
   const actionMemories = useMemo(() => {
     return memories.filter((m) => m.type === 'assistant' && m.interpretation);
   }, [memories]);
@@ -85,7 +77,6 @@ export function MemoriesListPage({
     return groupMemoriesByPeriod(actionMemories);
   }, [actionMemories]);
 
-  // Rastrear IDs de memórias para detectar novas
   const previousMemoryIdsRef = useRef<Set<string>>(new Set());
   const newMemoryIdsRef = useRef<Set<string>>(new Set());
   const isInitialMountRef = useRef(true);
@@ -94,14 +85,12 @@ export function MemoriesListPage({
     const currentIds = new Set(actionMemories.map((m) => m.id));
     const previousIds = previousMemoryIdsRef.current;
 
-    // Na primeira montagem, apenas inicializar sem animar
     if (isInitialMountRef.current) {
       previousMemoryIdsRef.current = currentIds;
       isInitialMountRef.current = false;
       return;
     }
 
-    // Detectar novas memórias (presentes agora, mas não antes)
     const newIds = new Set<string>();
     currentIds.forEach((id) => {
       if (!previousIds.has(id)) {
@@ -109,11 +98,9 @@ export function MemoriesListPage({
       }
     });
 
-    // Atualizar referências
     previousMemoryIdsRef.current = currentIds;
     newMemoryIdsRef.current = newIds;
 
-    // Limpar flag de "nova" após a animação (500ms)
     if (newIds.size > 0) {
       const timeout = setTimeout(() => {
         newMemoryIdsRef.current.clear();
@@ -123,48 +110,108 @@ export function MemoriesListPage({
   }, [actionMemories]);
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      {/* Header acolhedor */}
-      <div className="px-4 py-10 border-b border-border/15">
-        <h1 className="text-2xl text-text-primary mb-2" style={{ fontWeight: 600 }}>
-          Suas Memórias
-        </h1>
-        <p className="text-sm text-text-secondary/50 leading-relaxed">
-          Um lugar seguro para tudo que você precisa lembrar.
-        </p>
-      </div>
+    <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-gray-50/50 to-white">
+      {/* Header com glassmorphism */}
+      <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-200/50">
+        <div className="px-6 py-6">
+          <div className="max-w-3xl mx-auto">
+            {/* Título e contador */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-3xl font-semibold text-text-primary mb-1">
+                  Memórias
+                </h1>
+                <p className="text-sm text-text-secondary/60">
+                  {actionMemories.length} {actionMemories.length === 1 ? 'registro' : 'registros'} organizados
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Botão de busca */}
+                <button className="p-3 bg-white rounded-2xl border border-gray-200/50 hover:bg-gray-50 transition-all shadow-sm active:scale-95">
+                  <Search className="w-5 h-5 text-text-secondary" strokeWidth={2} />
+                </button>
+                {/* Botão de filtro */}
+                <button className="p-3 bg-white rounded-2xl border border-gray-200/50 hover:bg-gray-50 transition-all shadow-sm active:scale-95">
+                  <Filter className="w-5 h-5 text-text-secondary" strokeWidth={2} />
+                </button>
+              </div>
+            </div>
 
-      {/* Conteúdo organizado */}
-      {actionMemories.length === 0 ? (
-        <MemoriesEmptyState />
-      ) : (
-        <div className="px-4 py-10">
-          <div className="max-w-2xl mx-auto space-y-14">
-            {groupedMemories.map((group) => (
-              <div key={group.period} className="space-y-5">
-                {/* Header do período - sticky e suave */}
-                <div className="sticky top-0 bg-background/98 backdrop-blur-sm z-10 py-5 -mt-2 mb-4">
-                  <h2 className="text-xs text-text-secondary/50 uppercase tracking-wider" style={{ fontWeight: 600, letterSpacing: '0.05em' }}>
-                    {group.period}
-                  </h2>
+            {/* Stats cards - iOS style */}
+            {actionMemories.length > 0 && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl border border-blue-200/30">
+                  <p className="text-2xl font-semibold text-blue-600 mb-1">
+                    {actionMemories.filter(m => m.interpretation?.action_type === 'task').length}
+                  </p>
+                  <p className="text-xs text-blue-600/70 font-medium">Tarefas</p>
                 </div>
-
-                {/* Cards de memória - com respiro e animação */}
-                <div className="space-y-4">
-                  {group.memories.map((memory) => (
-                    <MemoryListCard
-                      key={memory.id}
-                      memory={memory}
-                      isNew={newMemoryIdsRef.current.has(memory.id)}
-                    />
-                  ))}
+                <div className="p-4 bg-gradient-to-br from-green-50 to-green-100/50 rounded-2xl border border-green-200/30">
+                  <p className="text-2xl font-semibold text-green-600 mb-1">
+                    {actionMemories.filter(m => m.interpretation?.action_type === 'note').length}
+                  </p>
+                  <p className="text-xs text-green-600/70 font-medium">Notas</p>
+                </div>
+                <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100/50 rounded-2xl border border-purple-200/30">
+                  <p className="text-2xl font-semibold text-purple-600 mb-1">
+                    {actionMemories.filter(m => m.interpretation?.action_type === 'reminder').length}
+                  </p>
+                  <p className="text-xs text-purple-600/70 font-medium">Lembretes</p>
                 </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Conteúdo com scroll */}
+      <div className="flex-1 overflow-y-auto">
+        {actionMemories.length === 0 ? (
+          <MemoriesEmptyState />
+        ) : (
+          <div className="px-6 py-8">
+            <div className="max-w-3xl mx-auto space-y-12">
+              {groupedMemories.map((group) => (
+                <div key={group.period} className="space-y-4">
+                  {/* Header do período com glassmorphism */}
+                  <div className="sticky top-0 z-10 py-3 -mx-2 px-2">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-xl rounded-full border border-gray-200/50 shadow-sm">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-500" strokeWidth={2} />
+                      <h2 className="text-sm font-semibold text-text-primary">
+                        {group.period}
+                      </h2>
+                      <span className="text-xs text-text-secondary/60">
+                        {group.memories.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Cards de memória com espaçamento generoso */}
+                  <div className="space-y-3">
+                    {group.memories.map((memory) => (
+                      <MemoryListCard
+                        key={memory.id}
+                        memory={memory}
+                        isNew={newMemoryIdsRef.current.has(memory.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Footer motivacional */}
+              <div className="text-center py-8">
+                <div className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-full border border-gray-200/30">
+                  <Sparkles className="w-4 h-4 text-blue-500" strokeWidth={2} />
+                  <p className="text-sm text-text-secondary/70">
+                    Todas as memórias organizadas
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-
