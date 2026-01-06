@@ -96,42 +96,42 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 
   return (
     <div
-      className={`border rounded-xl p-3 transition-all hover:shadow-sm ${typeInfo.color} opacity-75`}
+      className={`border rounded-xl p-4 transition-all hover:shadow-sm bg-white dark:bg-surface-dark border-border/40 dark:border-border-dark/40`}
     >
-      <div className="flex items-start gap-2.5">
-        {/* Indicador visual lateral - mais sutil */}
-        <div className={`flex-shrink-0 w-0.5 h-10 rounded-full ${typeInfo.dotColor} opacity-40`} />
+      <div className="flex items-start gap-3">
+        {/* Acento mínimo - dot muito discreto */}
+        <div className={`flex-shrink-0 w-1 h-1 rounded-full ${typeInfo.dotColor} opacity-30 mt-2`} />
         
         <div className="flex-1 min-w-0">
-          {/* Header com tipo e data - mais discreto */}
-          <div className="flex items-center gap-1.5 mb-2">
-            <Icon className="w-3.5 h-3.5 text-text-secondary/40" strokeWidth={2} />
-            <span className="text-xs text-text-secondary/50" style={{ fontWeight: 400 }}>
-              {typeInfo.label}
-            </span>
-            {dateStr && (
-              <>
-                <span className="text-text-secondary/30">·</span>
-                <span className="text-xs text-text-secondary/50">{dateStr}</span>
-                {timeStr && (
-                  <span className="text-xs text-text-secondary/40 ml-1">{timeStr}</span>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Conteúdo - menor contraste */}
+          {/* Conteúdo como protagonista */}
           {memory.content && (
-            <p className="text-text-primary/70 text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ fontWeight: 400 }}>
+            <p className="text-text-primary dark:text-text-primary-dark text-base leading-relaxed whitespace-pre-wrap break-words mb-2" style={{ fontWeight: 400 }}>
               {memory.content}
             </p>
           )}
 
-          {/* Status de confirmação se necessário */}
+          {/* Metadados extremamente discretos - apenas hora/data */}
+          <div className="flex items-center gap-2">
+            {/* Ícone pequeno neutro (16px) */}
+            <Icon className="w-4 h-4 text-text-secondary/30 dark:text-text-secondary-dark/30" strokeWidth={1.5} />
+            {timeStr && (
+              <span className="text-xs text-text-secondary/40 dark:text-text-secondary-dark/40" style={{ fontWeight: 400 }}>
+                {timeStr}
+              </span>
+            )}
+            {dateStr && dateStr !== 'Hoje' && (
+              <>
+                <span className="text-text-secondary/25 dark:text-text-secondary-dark/25">·</span>
+                <span className="text-xs text-text-secondary/40 dark:text-text-secondary-dark/40">{dateStr}</span>
+              </>
+            )}
+          </div>
+
+          {/* Status de confirmação se necessário - muito discreto */}
           {memory.needsConfirmation && (
-            <div className="mt-2.5 flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div>
-              <span className="text-xs text-text-secondary/70">Aguardando</span>
+            <div className="mt-2 flex items-center gap-1.5">
+              <div className="w-1 h-1 rounded-full bg-yellow-500/60"></div>
+              <span className="text-xs text-text-secondary/50 dark:text-text-secondary-dark/50">Aguardando</span>
             </div>
           )}
         </div>

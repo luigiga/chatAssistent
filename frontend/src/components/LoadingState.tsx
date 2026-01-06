@@ -5,9 +5,9 @@ export function LoadingState() {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4">
       <div className="relative">
-        <div className="w-12 h-12 border-4 border-blue-soft border-t-blue-primary rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-blue-soft dark:border-blue-primary/20 border-t-blue-primary rounded-full animate-spin"></div>
       </div>
-      <p className="mt-4 text-text-secondary text-sm font-medium">
+      <p className="mt-4 text-text-secondary dark:text-text-secondary-dark text-sm font-medium">
         Organizando seus pensamentos...
       </p>
     </div>

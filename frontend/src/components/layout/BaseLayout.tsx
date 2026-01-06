@@ -27,17 +27,16 @@ export function BaseLayout({
   onTabChange,
 }: BaseLayoutProps) {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background dark:bg-background-dark">
       {/* Conteúdo principal */}
       <main className={`flex-1 flex flex-col overflow-hidden ${showTabBar ? 'pb-16' : ''}`}>
         {children}
       </main>
 
-      {/* FUTURO: Tab Bar de navegação (iOS-like)
-          Para ativar: passar showTabBar={true} e implementar onTabChange
-          Estrutura já preparada com 3 abas: Capturar, Memórias, Você
+      {/* Tab Bar de navegação (iOS-like)
+          Não renderizar na tela de Capturar, pois está integrado no container do input
       */}
-      {showTabBar && (
+      {showTabBar && activeTab !== 'capture' && (
         <TabBar activeTab={activeTab} onTabChange={onTabChange} />
       )}
     </div>

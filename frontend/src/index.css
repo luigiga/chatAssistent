@@ -5,23 +5,51 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Radius tokens */
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --radius-3xl: 1.5rem;
+
+    /* Opacidades */
+    --border-opacity: 0.1;
+    --glass-bg-opacity: 0.6;
+    --text-body-opacity: 0.75;
+    --text-meta-opacity: 0.55;
+
+    /* Sombras suaves */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  }
+
   body {
-    @apply bg-background text-text-primary font-sans antialiased;
-    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    @apply bg-background dark:bg-background-dark text-text-primary dark:text-text-primary-dark font-sans antialiased;
+    font-family:
+      'Roboto',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    background: linear-gradient(to bottom, var(--background), var(--background) 95%);
+  }
+
+  .dark body {
+    background: linear-gradient(to bottom, var(--background-dark), var(--background-dark) 95%);
   }
 }
 
 @layer utilities {
   /* Animação de bounce para dots de loading */
   @keyframes bounce {
-    0%, 100% {
+    0%,
+    100% {
       transform: translateY(0);
     }
     50% {
       transform: translateY(-4px);
     }
   }
-  
+
   .animate-bounce {
     animation: bounce 1s infinite;
   }
@@ -30,7 +58,7 @@
   @keyframes memoryAppear {
     from {
       opacity: 0;
-      transform: translateY(8px);
+      transform: translateY(12px);
     }
     to {
       opacity: 1;
@@ -39,6 +67,17 @@
   }
 
   .animate-memory-appear {
-    animation: memoryAppear 400ms ease-out;
+    animation: memoryAppear 450ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Noise overlay muito sutil */
+  .noise-overlay {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
+    opacity: 0.015;
+  }
+
+  /* Safe area para dispositivos com notch */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 1rem);
   }
 }

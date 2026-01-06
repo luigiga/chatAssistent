@@ -11,6 +11,7 @@ interface MemoryEntryProps {
   type: MemoryEntryType;
   content?: string;
   interpretation?: MemoryInterpretationResponse['interpretation'];
+  originalText?: string; // Texto original do usuário (para exibir colapsado no ActionCard)
   interactionId?: string;
   needsConfirmation?: boolean;
   onConfirm?: (interactionId: string) => void;
@@ -23,6 +24,7 @@ export function MessageBubble({
   type,
   content,
   interpretation,
+  originalText,
   interactionId,
   needsConfirmation,
   onConfirm,
@@ -44,7 +46,7 @@ export function MessageBubble({
     // Transformar erro em confirmação neutra
     return (
       <div className="py-1">
-        <p className="text-text-secondary text-xs whitespace-pre-wrap break-words">
+        <p className="text-text-secondary dark:text-text-secondary-dark text-xs whitespace-pre-wrap break-words">
           Registro salvo.
         </p>
       </div>
@@ -62,11 +64,11 @@ export function MessageBubble({
         {/* Indicador de registro */}
         <div className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-primary mt-1.5" />
         <div className="flex-1 min-w-0">
-          <p className="text-text-primary text-sm leading-relaxed whitespace-pre-wrap break-words">
+          <p className="text-text-primary dark:text-text-primary-dark text-sm leading-relaxed whitespace-pre-wrap break-words">
             {content}
           </p>
           {timeStr && (
-            <p className="text-text-secondary/60 text-xs mt-1">
+            <p className="text-text-secondary/60 dark:text-text-secondary-dark/60 text-xs mt-1">
               {timeStr}
             </p>
           )}
@@ -82,6 +84,7 @@ export function MessageBubble({
       <div>
         <ActionCard
           interpretation={interpretation}
+          originalText={originalText}
           needsConfirmation={needsConfirmation}
           interactionId={interactionId}
           onConfirm={onConfirm}

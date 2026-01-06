@@ -1,26 +1,29 @@
 /**
  * Componente principal da aplicação - Interface de Memória Pessoal
- * 
+ *
  * ESTRUTURA PREPARADA PARA NAVEGAÇÃO FUTURA:
  * - BaseLayout: Layout base com suporte para Tab Bar
  * - MainContent: Container para conteúdo da tela atual
  * - TabBar: Componente de navegação (estrutura preparada, não ativo)
  *   - 3 abas futuras: Capturar, Memórias, Você
  *   - Para ativar: passar showTabBar={true} no BaseLayout
- * 
+ *
  * FUTURO: Navegação entre telas (3 abas):
  * - Capturar: Campo principal para registrar pensamentos (tela atual)
  * - Memórias: Timeline completa de todas as memórias registradas
  * - Você: Perfil, configurações e estatísticas do usuário
  */
 import { useState, useCallback } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { BaseLayout } from './components/layout/BaseLayout';
 import { MainContent } from './components/layout/MainContent';
 import { AppHeader } from './components/layout/AppHeader';
 import { MemoriesPage } from './pages/MemoriesPage';
 import { MemoriesListPage } from './pages/MemoriesListPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { PageTransition } from './components/ui/PageTransition';
 import type { MemoryEntry } from './components/MemoryTimeline';
 import type { TabId } from './components/navigation/TabBar';
 import { LoginForm } from './components/LoginForm';
@@ -44,110 +47,110 @@ function MemoryInterface() {
     setActiveTab(tab);
   };
 
-  const handleSave = useCallback(async (text: string) => {
-    if (!accessToken) {
-      return;
-    }
+  const handleSave = useCallback(
+    async (text: string) => {
+      if (!accessToken) {
+        return;
+      }
 
-    // Adicionar entrada do usuário
-    const userInput: MemoryEntry = {
-      id: `user-${Date.now()}`,
-      type: 'user',
-      content: text,
-      timestamp: new Date(),
-    };
+      // Adicionar entrada do usuário
+      const userInput: MemoryEntry = {
+        id: `user-${Date.now()}`,
+        type: 'user',
+        content: text,
+        timestamp: new Date(),
+      };
 
-    setMemories((prev) => [...prev, userInput]);
-    setIsLoading(true);
+      setMemories((prev) => [...prev, userInput]);
+      setIsLoading(true);
 
-    // Adicionar indicador de processamento
-    const processingIndicator: MemoryEntry = {
-      id: `loading-${Date.now()}`,
-      type: 'loading',
-      timestamp: new Date(),
-    };
+      // Adicionar indicador de processamento
+      const processingIndicator: MemoryEntry = {
+        id: `loading-${Date.now()}`,
+        type: 'loading',
+        timestamp: new Date(),
+      };
 
-    setMemories((prev) => [...prev, processingIndicator]);
+      setMemories((prev) => [...prev, processingIndicator]);
 
-    try {
-      // Chamar API com token de autenticação e função de refresh
-      const response: MemoryInterpretationResponse = await interpretText(
-        text,
-        accessToken,
-        refreshAccessToken,
-      );
+      try {
+        // Chamar API com token de autenticação e função de refresh
+        const response: MemoryInterpretationResponse = await interpretText(
+          text,
+          accessToken,
+          refreshAccessToken,
+        );
 
-      // Remover indicador de processamento e adicionar resposta do assistente
-      setMemories((prev) => {
-        const withoutLoading = prev.filter((msg) => msg.id !== processingIndicator.id);
-        
-        // Se a IA não conseguiu classificar (unknown), tratar como nota genérica
-        let interpretation = response.interpretation;
-        if (interpretation.action_type === 'unknown') {
-          interpretation = {
-            ...interpretation,
-            action_type: 'note',
-            note: {
-              content: text, // Usar o texto original do usuário
-            },
-            needs_confirmation: false, // Sempre salvar automaticamente
+        // Remover indicador de processamento e adicionar resposta do assistente
+        setMemories((prev) => {
+          const withoutLoading = prev.filter((msg) => msg.id !== processingIndicator.id);
+
+          // Se a IA não conseguiu classificar (unknown), tratar como nota genérica
+          let interpretation = response.interpretation;
+          if (interpretation.action_type === 'unknown') {
+            interpretation = {
+              ...interpretation,
+              action_type: 'note',
+              note: {
+                content: text, // Usar o texto original do usuário
+              },
+              needs_confirmation: false, // Sempre salvar automaticamente
+            };
+          }
+
+          const savedAction: MemoryEntry = {
+            id: `assistant-${Date.now()}`,
+            type: 'assistant',
+            interpretation,
+            interactionId: response.interactionId,
+            needsConfirmation: interpretation.needs_confirmation,
+            timestamp: new Date(),
           };
-        }
-        
-        const savedAction: MemoryEntry = {
-          id: `assistant-${Date.now()}`,
-          type: 'assistant',
-          interpretation,
-          interactionId: response.interactionId,
-          needsConfirmation: interpretation.needs_confirmation,
-          timestamp: new Date(),
-        };
-        
-        // Destacar input após criação de memória
-        setHighlightInput(true);
-        setTimeout(() => setHighlightInput(false), 100);
-        
-        return [...withoutLoading, savedAction];
-      });
-    } catch (error) {
-      // Remover indicador de processamento
-      setMemories((prev) => {
-        const withoutLoading = prev.filter((msg) => msg.id !== processingIndicator.id);
-        
-        const errorMessage =
-          error instanceof Error ? error.message : 'Não foi possível processar';
 
-        // Se o erro for de sessão expirada, fazer logout após um delay
-        if (
-          errorMessage.includes('Sessão expirada') ||
-          errorMessage.includes('login')
-        ) {
-          setTimeout(() => {
-            handleLogout();
-          }, 2000);
-          return withoutLoading;
-        }
+          // Destacar input após criação de memória
+          setHighlightInput(true);
+          setTimeout(() => setHighlightInput(false), 100);
 
-        // Em caso de erro, salvar como nota genérica ao invés de mostrar erro
-        // O usuário nunca deve sentir que "falou errado"
-        const savedAction: MemoryEntry = {
-          id: `assistant-${Date.now()}`,
-          type: 'assistant',
-          interpretation: {
-            needs_confirmation: false,
-            action_type: 'note',
-            note: {
-              content: text, // Salvar o texto original do usuário
+          return [...withoutLoading, savedAction];
+        });
+      } catch (error) {
+        // Remover indicador de processamento
+        setMemories((prev) => {
+          const withoutLoading = prev.filter((msg) => msg.id !== processingIndicator.id);
+
+          const errorMessage =
+            error instanceof Error ? error.message : 'Não foi possível processar';
+
+          // Se o erro for de sessão expirada, fazer logout após um delay
+          if (errorMessage.includes('Sessão expirada') || errorMessage.includes('login')) {
+            setTimeout(() => {
+              handleLogout();
+            }, 2000);
+            return withoutLoading;
+          }
+
+          // Em caso de erro, salvar como nota genérica ao invés de mostrar erro
+          // O usuário nunca deve sentir que "falou errado"
+          const savedAction: MemoryEntry = {
+            id: `assistant-${Date.now()}`,
+            type: 'assistant',
+            interpretation: {
+              needs_confirmation: false,
+              action_type: 'note',
+              note: {
+                content: text, // Salvar o texto original do usuário
+              },
             },
-          },
-          timestamp: new Date(),
-        };
-        return [...withoutLoading, savedAction];
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [accessToken, refreshAccessToken, handleLogout]);
+            timestamp: new Date(),
+          };
+          return [...withoutLoading, savedAction];
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [accessToken, refreshAccessToken, handleLogout],
+  );
 
   const handleConfirm = useCallback(
     async (interactionId: string) => {
@@ -156,11 +159,7 @@ function MemoryInterface() {
       setConfirmingIds((prev) => new Set(prev).add(interactionId));
 
       try {
-        await confirmInteraction(
-          accessToken,
-          interactionId,
-          refreshAccessToken,
-        );
+        await confirmInteraction(accessToken, interactionId, refreshAccessToken);
 
         // Atualizar memória para remover botões de confirmação
         setMemories((prev) =>
@@ -246,7 +245,7 @@ function MemoryInterface() {
       case 'capture':
         return 'Lumeo';
       case 'memories':
-        return 'Memórias';
+        return undefined; // Header neutro na aba Memórias
       case 'profile':
         return 'Você';
       default:
@@ -259,7 +258,7 @@ function MemoryInterface() {
       case 'capture':
         return 'Assistente de memória pessoal';
       case 'memories':
-        return 'Todas as suas memórias';
+        return undefined; // Header neutro na aba Memórias
       case 'profile':
         return undefined;
       default:
@@ -277,9 +276,7 @@ function MemoryInterface() {
           activeTab === 'profile' ? undefined : (
             <>
               {user && (
-                <span className="text-sm text-text-secondary">
-                  {user.name || user.email}
-                </span>
+                <span className="text-sm text-text-secondary">{user.name || user.email}</span>
               )}
               <button
                 onClick={handleLogout}
@@ -292,25 +289,35 @@ function MemoryInterface() {
         }
       />
 
-      {/* Renderização condicional baseada em tab ativa */}
+      {/* Renderização condicional baseada em tab ativa com transição suave */}
       <MainContent>
-        {activeTab === 'capture' && (
-          <MemoriesPage
-            memories={memories}
-            onSave={handleSave}
-            onConfirm={handleConfirm}
-            onReject={handleReject}
-            confirmingIds={confirmingIds}
-            isLoading={isLoading}
-            highlightInput={highlightInput}
-          />
-        )}
-        {activeTab === 'memories' && (
-          <MemoriesListPage memories={memories} />
-        )}
-        {activeTab === 'profile' && (
-          <ProfilePage user={user || undefined} onLogout={handleLogout} />
-        )}
+        <AnimatePresence mode="wait" initial={false}>
+          {activeTab === 'capture' && (
+            <PageTransition key="capture">
+              <MemoriesPage
+                memories={memories}
+                onSave={handleSave}
+                onConfirm={handleConfirm}
+                onReject={handleReject}
+                confirmingIds={confirmingIds}
+                isLoading={isLoading}
+                highlightInput={highlightInput}
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+              />
+            </PageTransition>
+          )}
+          {activeTab === 'memories' && (
+            <PageTransition key="memories">
+              <MemoriesListPage memories={memories} />
+            </PageTransition>
+          )}
+          {activeTab === 'profile' && (
+            <PageTransition key="profile">
+              <ProfilePage user={user || undefined} onLogout={handleLogout} memories={memories} />
+            </PageTransition>
+          )}
+        </AnimatePresence>
       </MainContent>
     </BaseLayout>
   );
@@ -346,9 +353,11 @@ function App() {
 
 function AppWithProvider() {
   return (
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

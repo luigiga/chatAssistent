@@ -8,11 +8,11 @@ interface ErrorStateProps {
 
 export function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
-    <div className="bg-surface border border-error/20 rounded-2xl p-6">
+    <div className="bg-surface dark:bg-surface-dark border border-error/20 dark:border-error/30 rounded-2xl p-6">
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0">
           <svg
-            className="w-6 h-6 text-error"
+            className="w-6 h-6 text-error dark:text-red-400"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -26,8 +26,8 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
           </svg>
         </div>
         <div className="flex-1">
-          <h3 className="text-text-primary font-semibold mb-1">Erro</h3>
-          <p className="text-text-secondary text-sm mb-4">{message}</p>
+          <h3 className="text-text-primary dark:text-text-primary-dark font-semibold mb-1">Erro</h3>
+          <p className="text-text-secondary dark:text-text-secondary-dark text-sm mb-4">{message}</p>
           {onRetry && (
             <button
               onClick={onRetry}

@@ -13,7 +13,7 @@ interface MainContentProps {
 
 export function MainContent({ children, className = '' }: MainContentProps) {
   return (
-    <div className={`flex-1 flex flex-col ${className}`}>
+    <div className={`flex-1 flex flex-col pt-16 overflow-hidden ${className}`}>
       {children}
     </div>
   );

@@ -2,11 +2,13 @@
  * Cartão de confirmação de ação
  * Exibe ações registradas de forma limpa e objetiva
  */
-import { CheckCircle2, ClipboardList, FileText, Bell, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, ClipboardList, FileText, Bell, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import type { MemoryInterpretationResponse } from '../services/api';
 
 interface ActionCardProps {
   interpretation: MemoryInterpretationResponse['interpretation'];
+  originalText?: string; // Texto original do usuário (para exibir colapsado)
   needsConfirmation?: boolean;
   interactionId?: string;
   onConfirm?: (interactionId: string) => void;
@@ -16,12 +18,15 @@ interface ActionCardProps {
 
 export function ActionCard({
   interpretation,
+  originalText,
   needsConfirmation,
   interactionId,
   onConfirm,
   onReject,
   isConfirming = false,
 }: ActionCardProps) {
+  const [showOriginalText, setShowOriginalText] = useState(false);
+
   const getTypeInfo = () => {
     switch (interpretation.action_type) {
       case 'task':
@@ -150,24 +155,24 @@ export function ActionCard({
     const content = interpretation.note?.content || interpretation.note?.title || 'Registro salvo.';
     
     return (
-      <div className={`border rounded-2xl p-4 shadow-sm ${typeInfo.color}`}>
+      <div className={`border rounded-2xl p-4 shadow-sm ${typeInfo.color} border-border/30 dark:border-border-dark/30`}>
         <div className="flex items-start gap-3">
           {/* Ícone do tipo */}
-          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/80 flex items-center justify-center border border-border/30">
+          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/80 dark:bg-surface-dark/80 flex items-center justify-center border border-border/30 dark:border-border-dark/30">
             <Icon className={`w-5 h-5 ${typeInfo.iconColor}`} strokeWidth={2} />
           </div>
           
           <div className="flex-1 min-w-0">
             {/* Header com tipo */}
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs text-text-secondary" style={{ fontWeight: 500 }}>
+              <span className="text-xs text-text-secondary dark:text-text-secondary-dark" style={{ fontWeight: 500 }}>
                 {typeInfo.label}
               </span>
-              <CheckCircle2 className="w-3.5 h-3.5 text-green-600" strokeWidth={2} />
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" strokeWidth={2} />
             </div>
             
             {/* Conteúdo principal */}
-            <p className="text-text-primary text-base mb-2 break-words leading-snug" style={{ fontWeight: 500 }}>
+            <p className="text-text-primary dark:text-text-primary-dark text-base mb-2 break-words leading-snug" style={{ fontWeight: 500 }}>
               {content}
             </p>
           </div>
@@ -179,28 +184,32 @@ export function ActionCard({
   const typeInfo = getTypeInfo();
   const { Icon } = typeInfo;
   const details = getDetails();
+  const finalContent = getContent();
+  
+  // Verificar se o texto original é diferente do conteúdo final
+  const shouldShowOriginal = originalText && originalText.trim() !== finalContent?.trim();
 
   return (
-    <div className={`border rounded-2xl p-5 shadow-sm ${typeInfo.color}`}>
+    <div className={`border rounded-2xl p-5 shadow-sm ${typeInfo.color} border-border/30 dark:border-border-dark/30 bg-white/95 dark:bg-surface-dark/95`}>
       <div className="flex items-start gap-4">
         {/* Ícone do tipo - mais discreto */}
-        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/60 flex items-center justify-center border border-border/20">
+        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/60 dark:bg-surface-dark/60 flex items-center justify-center border border-border/20 dark:border-border-dark/20">
           <Icon className={`w-4 h-4 ${typeInfo.iconColor} opacity-70`} strokeWidth={2} />
         </div>
         
         <div className="flex-1 min-w-0">
           {/* Header com tipo - muito discreto, como metadado */}
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-xs text-text-secondary/50" style={{ fontWeight: 400 }}>
+            <span className="text-xs text-text-secondary/50 dark:text-text-secondary-dark/50" style={{ fontWeight: 400 }}>
               {typeInfo.label}
             </span>
             {!needsConfirmation && (
-              <CheckCircle2 className="w-3 h-3 text-green-600/60" strokeWidth={2} />
+              <CheckCircle2 className="w-3 h-3 text-green-600/60 dark:text-green-400/60" strokeWidth={2} />
             )}
           </div>
           
           {/* Conteúdo principal - hierarquia máxima */}
-          <p className="text-text-primary text-xl mb-4 break-words leading-tight" style={{ fontWeight: 600 }}>
+          <p className="text-text-primary dark:text-text-primary-dark text-xl mb-4 break-words leading-tight" style={{ fontWeight: 600 }}>
             {getContent()}
           </p>
           
@@ -209,10 +218,10 @@ export function ActionCard({
             <div className="mt-4 space-y-2">
               {details.map((detail, index) => (
                 <div key={index} className="flex items-start gap-2">
-                  <span className="text-xs text-text-secondary/50 min-w-[60px]" style={{ fontWeight: 500 }}>
+                  <span className="text-xs text-text-secondary/50 dark:text-text-secondary-dark/50 min-w-[60px]" style={{ fontWeight: 500 }}>
                     {detail.label}:
                   </span>
-                  <span className="text-xs text-text-secondary/70 flex-1">
+                  <span className="text-xs text-text-secondary/70 dark:text-text-secondary-dark/70 flex-1">
                     {detail.value}
                   </span>
                 </div>
@@ -221,24 +230,46 @@ export function ActionCard({
           )}
           {/* Descrições adicionais - mais suaves */}
           {interpretation.task?.description && (
-            <p className="text-xs text-text-secondary/70 mt-4 pt-4 border-t border-border/20 break-words leading-relaxed">
+            <p className="text-xs text-text-secondary/70 dark:text-text-secondary-dark/70 mt-4 pt-4 border-t border-border/20 dark:border-border-dark/20 break-words leading-relaxed">
               {interpretation.task.description}
             </p>
           )}
           {interpretation.note?.content && !interpretation.note.title && (
-            <p className="text-xs text-text-secondary/70 mt-4 pt-4 border-t border-border/20 break-words leading-relaxed">
+            <p className="text-xs text-text-secondary/70 dark:text-text-secondary-dark/70 mt-4 pt-4 border-t border-border/20 dark:border-border-dark/20 break-words leading-relaxed">
               {interpretation.note.content}
             </p>
           )}
           {interpretation.reminder?.description && (
-            <p className="text-xs text-text-secondary/70 mt-4 pt-4 border-t border-border/20 break-words leading-relaxed">
+            <p className="text-xs text-text-secondary/70 dark:text-text-secondary-dark/70 mt-4 pt-4 border-t border-border/20 dark:border-border-dark/20 break-words leading-relaxed">
               {interpretation.reminder.description}
             </p>
+          )}
+          
+          {/* Texto original colapsado - apenas se for diferente do conteúdo final */}
+          {shouldShowOriginal && (
+            <div className="mt-4 pt-4 border-t border-border/20 dark:border-border-dark/20">
+              <button
+                onClick={() => setShowOriginalText(!showOriginalText)}
+                className="w-full flex items-center justify-between text-xs text-text-secondary/60 dark:text-text-secondary-dark/60 hover:text-text-secondary/80 dark:hover:text-text-secondary-dark/80 transition-colors"
+              >
+                <span style={{ fontWeight: 400 }}>Entrada original</span>
+                {showOriginalText ? (
+                  <ChevronUp className="w-3.5 h-3.5" strokeWidth={2} />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" strokeWidth={2} />
+                )}
+              </button>
+              {showOriginalText && (
+                <p className="mt-2 text-xs text-text-secondary/50 dark:text-text-secondary-dark/50 break-words leading-relaxed whitespace-pre-wrap">
+                  {originalText}
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>
       {showConfirmationButtons && (
-        <div className="mt-5 pt-5 border-t border-border/30 flex gap-3">
+        <div className="mt-5 pt-5 border-t border-border/30 dark:border-border-dark/30 flex gap-3">
           <button
             onClick={() => onConfirm(interactionId)}
             disabled={isConfirming}
@@ -250,7 +281,7 @@ export function ActionCard({
           <button
             onClick={() => onReject(interactionId)}
             disabled={isConfirming}
-            className="flex-1 px-4 py-2.5 bg-white border border-border/50 text-text-secondary rounded-xl text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2.5 bg-white dark:bg-surface-dark border border-border/50 dark:border-border-dark/50 text-text-secondary dark:text-text-secondary-dark rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ fontWeight: 500 }}
           >
             Cancelar

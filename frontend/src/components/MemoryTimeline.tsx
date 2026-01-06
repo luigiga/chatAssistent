@@ -8,6 +8,20 @@ import { MemoryCard } from './MemoryCard';
 import { EmptyState } from './EmptyState';
 import type { MemoryInterpretationResponse } from '../services/api';
 
+export type MemoryCategory = 'Pessoal' | 'Trabalho' | 'Saúde' | 'Finanças' | 'Ideias' | 'Rotina';
+
+export interface MemoryObservation {
+  id: string;
+  text: string;
+  createdAt: Date;
+}
+
+export interface MemoryMetadata {
+  category?: MemoryCategory | string;
+  observations?: MemoryObservation[];
+  isFavorite?: boolean;
+}
+
 export interface MemoryEntry {
   id: string;
   type: MemoryEntryType;
@@ -16,6 +30,12 @@ export interface MemoryEntry {
   interactionId?: string;
   needsConfirmation?: boolean;
   timestamp: Date;
+  metadata?: MemoryMetadata;
+}
+
+// Estender MemoryEntry para compatibilidade com metadados
+export interface ExtendedMemoryEntry extends MemoryEntry {
+  metadata?: MemoryMetadata;
 }
 
 interface MemoryTimelineProps {
@@ -122,8 +142,8 @@ export function MemoryTimeline({
   }, [memories]);
 
   return (
-    <div className="px-4 py-6 pb-6">
-      <div className="max-w-2xl mx-auto">
+    <div className="px-4 py-6 pb-6 bg-background dark:bg-background-dark">
+      <div className="max-w-md mx-auto">
         {memories.length === 0 ? (
           <EmptyState onSuggestionClick={onSuggestionClick} />
         ) : (
@@ -131,8 +151,11 @@ export function MemoryTimeline({
             {groupedMemories.map((group) => (
               <div key={group.period} className="space-y-4">
                 {/* Header do período */}
-                <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 py-3 -mt-2 mb-1">
-                  <h2 className="text-xs text-text-secondary" style={{ fontWeight: 500 }}>
+                <div className="sticky top-0 bg-background/95 dark:bg-background-dark/95 backdrop-blur-sm z-10 py-3 -mt-2 mb-1">
+                  <h2
+                    className="text-xs text-text-secondary dark:text-text-secondary-dark"
+                    style={{ fontWeight: 500 }}
+                  >
                     {group.period}
                   </h2>
                 </div>
@@ -146,14 +169,14 @@ export function MemoryTimeline({
                       array[index + 1]?.type === 'assistant' &&
                       array[index + 1]?.interpretation;
 
-                    // Usar MemoryCard para entradas do usuário
-                    // Se houver ação gerada, ocultar completamente o pensamento original
+                    // Para entradas do usuário: ocultar completamente quando há ação gerada
                     if (memory.type === 'user') {
                       if (hasFollowingAction) {
                         // Ocultar pensamento original quando há ação gerada
-                        // O card de ação é o elemento principal
+                        // O card de ação é o elemento principal e mostrará o texto original colapsado
                         return null;
                       }
+                      // Apenas mostrar pensamento original se não houver ação gerada
                       return (
                         <div key={memory.id}>
                           <MemoryCard memory={memory} />
@@ -161,7 +184,35 @@ export function MemoryTimeline({
                       );
                     }
 
-                    // Para outros tipos (assistant, loading, error), usar MessageBubble
+                    // Para respostas do assistente: verificar se há entrada do usuário anterior
+                    if (memory.type === 'assistant' && memory.interpretation) {
+                      const previousUserEntry =
+                        array[index - 1]?.type === 'user' ? array[index - 1] : null;
+                      const originalText = previousUserEntry?.content;
+
+                      return (
+                        <div key={memory.id}>
+                          <MessageBubble
+                            type={memory.type}
+                            content={memory.content}
+                            interpretation={memory.interpretation}
+                            originalText={originalText}
+                            interactionId={memory.interactionId}
+                            needsConfirmation={memory.needsConfirmation}
+                            onConfirm={onConfirm}
+                            onReject={onReject}
+                            isConfirming={
+                              memory.interactionId
+                                ? confirmingIds?.has(memory.interactionId)
+                                : false
+                            }
+                            timestamp={memory.timestamp}
+                          />
+                        </div>
+                      );
+                    }
+
+                    // Para outros tipos (loading, error), usar MessageBubble
                     // Apenas mostrar se não for uma confirmação silenciosa muito curta
                     const isShortConfirmation =
                       memory.type === 'assistant' &&

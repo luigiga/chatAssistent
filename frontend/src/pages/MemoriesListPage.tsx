@@ -1,217 +1,341 @@
 /**
- * Tela de Memórias - Lista Organizada
- * Design iOS + Magic UI - Visual suave e organizado
+ * Página de Lista de Memórias - Biblioteca Silenciosa
+ * Extensão visual da memória do usuário - organização, calma e clareza
+ * Modelo de Memory Spaces com navegação local
  */
-import { useMemo, useRef, useEffect } from 'react';
-import { Search, Filter, Sparkles } from 'lucide-react';
-import type { MemoryEntry } from '../components/MemoryTimeline';
-import { MemoryListCard } from '../components/MemoryListCard';
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, Calendar, CalendarDays, Lightbulb, Repeat, Archive } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import type { MemoryEntry, ExtendedMemoryEntry } from '../components/MemoryTimeline';
+import { MemorySpaceCard, type MemorySpaceKey } from '../components/MemorySpaceCard';
+import { MemorySpaceDetail } from '../components/MemorySpaceDetail';
 import { MemoriesEmptyState } from '../components/MemoriesEmptyState';
+import { MemoryDetailSheet } from '../components/memories/MemoryDetailSheet';
+import type { MemoryFilters } from '../components/memories/types';
+import { useMemoryMetadata } from '../hooks/useMemoryMetadata';
 
 interface MemoriesListPageProps {
   memories: MemoryEntry[];
 }
 
-function groupMemoriesByPeriod(memories: MemoryEntry[]) {
+interface MemorySpace {
+  spaceId: MemorySpaceKey;
+  title: string;
+  icon: LucideIcon;
+  memories: MemoryEntry[];
+  preview?: string;
+}
+
+/**
+ * Palavras-chave para detectar ideias
+ */
+const IDEA_KEYWORDS = ['ideia', 'projeto', 'talvez', 'pensar', 'criar'];
+
+/**
+ * Palavras-chave para detectar rotina
+ */
+const ROUTINE_KEYWORDS = ['todo dia', 'diário', 'rotina', 'tomar água', 'sempre', 'todos os dias'];
+
+/**
+ * Verifica se uma memória pertence ao espaço "Hoje"
+ */
+function isToday(memory: MemoryEntry): boolean {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const weekStart = new Date(today);
-  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const memoryDate = new Date(
+    memory.timestamp.getFullYear(),
+    memory.timestamp.getMonth(),
+    memory.timestamp.getDate(),
+  );
 
-  const groups: Array<{ period: string; memories: MemoryEntry[] }> = [];
+  // Verifica se foi criada hoje
+  if (memoryDate.getTime() === today.getTime()) {
+    return true;
+  }
+
+  // Verifica se tem due_date hoje
+  if (memory.interpretation?.task?.due_date) {
+    const dueDate = new Date(memory.interpretation.task.due_date);
+    const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+    if (dueDateOnly.getTime() === today.getTime()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Verifica se uma memória pertence ao espaço "Esta semana"
+ */
+function isThisWeek(memory: MemoryEntry): boolean {
+  if (isToday(memory)) {
+    return false; // Hoje tem prioridade
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
+  const memoryDate = new Date(
+    memory.timestamp.getFullYear(),
+    memory.timestamp.getMonth(),
+    memory.timestamp.getDate(),
+  );
+
+  return memoryDate >= weekAgo;
+}
+
+/**
+ * Verifica se uma memória pertence ao espaço "Ideias"
+ */
+function isIdea(memory: MemoryEntry): boolean {
+  // Verifica action_type (não existe 'idea' no tipo atual, mas podemos verificar conteúdo)
+  const content = memory.content?.toLowerCase() || '';
+  const interpretationContent =
+    memory.interpretation?.note?.content?.toLowerCase() ||
+    memory.interpretation?.task?.title?.toLowerCase() ||
+    memory.interpretation?.reminder?.title?.toLowerCase() ||
+    '';
+
+  const fullContent = `${content} ${interpretationContent}`;
+
+  return IDEA_KEYWORDS.some((keyword) => fullContent.includes(keyword));
+}
+
+/**
+ * Verifica se uma memória pertence ao espaço "Rotina"
+ */
+function isRoutine(memory: MemoryEntry): boolean {
+  // Verifica action_type (não existe 'habit' no tipo atual, mas podemos verificar conteúdo)
+  const content = memory.content?.toLowerCase() || '';
+  const interpretationContent =
+    memory.interpretation?.note?.content?.toLowerCase() ||
+    memory.interpretation?.task?.title?.toLowerCase() ||
+    memory.interpretation?.reminder?.title?.toLowerCase() ||
+    '';
+
+  const fullContent = `${content} ${interpretationContent}`;
+
+  return ROUTINE_KEYWORDS.some((keyword) => fullContent.includes(keyword));
+}
+
+/**
+ * Extrai preview de uma memória (primeira linha do conteúdo)
+ */
+function getMemoryPreview(memory: MemoryEntry): string | undefined {
+  if (memory.interpretation) {
+    if (memory.interpretation.task?.title) {
+      return memory.interpretation.task.title;
+    }
+    if (memory.interpretation.note?.title) {
+      return memory.interpretation.note.title;
+    }
+    if (memory.interpretation.note?.content) {
+      return memory.interpretation.note.content.split('\n')[0].substring(0, 60);
+    }
+    if (memory.interpretation.reminder?.title) {
+      return memory.interpretation.reminder.title;
+    }
+  }
+  if (memory.content) {
+    return memory.content.split('\n')[0].substring(0, 60);
+  }
+  return undefined;
+}
+
+/**
+ * Agrupa memórias em Memory Spaces com prioridades
+ * Prioridade: Hoje > Esta semana > Rotina > Ideias > Mais antigas
+ */
+function groupMemoriesIntoSpaces(memories: MemoryEntry[]): MemorySpace[] {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
+  const spaces: MemorySpace[] = [
+    { spaceId: 'today', title: 'Hoje', icon: Calendar, memories: [] },
+    { spaceId: 'thisWeek', title: 'Esta semana', icon: CalendarDays, memories: [] },
+    { spaceId: 'routine', title: 'Rotina', icon: Repeat, memories: [] },
+    { spaceId: 'ideas', title: 'Ideias', icon: Lightbulb, memories: [] },
+    { spaceId: 'older', title: 'Mais antigas', icon: Archive, memories: [] },
+  ];
+
+  // Ordenar memórias por data (mais recente primeiro)
   const sorted = [...memories].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-  const todayMemories: MemoryEntry[] = [];
-  const thisWeekMemories: MemoryEntry[] = [];
-  const olderMemories: MemoryEntry[] = [];
-
   sorted.forEach((memory) => {
-    const memoryDate = new Date(
-      memory.timestamp.getFullYear(),
-      memory.timestamp.getMonth(),
-      memory.timestamp.getDate(),
-    );
-
-    if (memoryDate.getTime() === today.getTime()) {
-      todayMemories.push(memory);
-    } else if (memoryDate >= weekStart) {
-      thisWeekMemories.push(memory);
+    // Aplicar prioridades em ordem
+    if (isToday(memory)) {
+      spaces[0].memories.push(memory);
+    } else if (isThisWeek(memory)) {
+      spaces[1].memories.push(memory);
+    } else if (isRoutine(memory)) {
+      spaces[2].memories.push(memory);
+    } else if (isIdea(memory)) {
+      spaces[3].memories.push(memory);
     } else {
-      olderMemories.push(memory);
+      spaces[4].memories.push(memory);
     }
   });
 
-  if (todayMemories.length > 0) {
-    groups.push({ period: 'Hoje', memories: todayMemories });
-  }
-  if (thisWeekMemories.length > 0) {
-    groups.push({ period: 'Esta semana', memories: thisWeekMemories });
-  }
-  if (olderMemories.length > 0) {
-    const byMonth = new Map<string, MemoryEntry[]>();
-    olderMemories.forEach((memory) => {
-      const monthKey = memory.timestamp.toLocaleDateString('pt-BR', {
-        month: 'long',
-        year: 'numeric',
-      });
-      if (!byMonth.has(monthKey)) {
-        byMonth.set(monthKey, []);
-      }
-      byMonth.get(monthKey)!.push(memory);
-    });
+  // Adicionar preview para cada espaço (primeira memória)
+  spaces.forEach((space) => {
+    if (space.memories.length > 0) {
+      space.preview = getMemoryPreview(space.memories[0]);
+    }
+  });
 
-    byMonth.forEach((monthMemories, monthKey) => {
-      groups.push({ period: monthKey, memories: monthMemories });
-    });
-  }
-
-  return groups;
+  return spaces;
 }
 
 export function MemoriesListPage({ memories }: MemoriesListPageProps) {
+  const { updateMetadata } = useMemoryMetadata();
+
+  // Filtrar apenas memórias do assistente (ações registradas)
   const actionMemories = useMemo(() => {
     return memories.filter((m) => m.type === 'assistant' && m.interpretation);
   }, [memories]);
 
-  const groupedMemories = useMemo(() => {
-    return groupMemoriesByPeriod(actionMemories);
+  // Estado de navegação local
+  const [activeSpace, setActiveSpace] = useState<MemorySpaceKey | null>(null);
+
+  // Estado para MemoryDetailSheet
+  const [selectedMemory, setSelectedMemory] = useState<ExtendedMemoryEntry | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+
+  // Estado para FilterSheet
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [filters, setFilters] = useState<MemoryFilters>({});
+
+  // Agrupar memórias em espaços
+  const memorySpaces = useMemo(() => {
+    return groupMemoriesIntoSpaces(actionMemories);
   }, [actionMemories]);
 
-  const previousMemoryIdsRef = useRef<Set<string>>(new Set());
-  const newMemoryIdsRef = useRef<Set<string>>(new Set());
-  const isInitialMountRef = useRef(true);
+  // Encontrar o espaço ativo
+  const activeSpaceData = useMemo(() => {
+    if (activeSpace === null) return null;
+    return memorySpaces.find((space) => space.spaceId === activeSpace) || null;
+  }, [activeSpace, memorySpaces]);
 
-  useEffect(() => {
-    const currentIds = new Set(actionMemories.map((m) => m.id));
-    const previousIds = previousMemoryIdsRef.current;
+  // Handler para clique em memória
+  const handleMemoryClick = (memory: MemoryEntry) => {
+    setSelectedMemory(memory as ExtendedMemoryEntry);
+    setDetailSheetOpen(true);
+  };
 
-    if (isInitialMountRef.current) {
-      previousMemoryIdsRef.current = currentIds;
-      isInitialMountRef.current = false;
-      return;
+  // Handler para atualizar memória
+  const handleMemoryUpdate = (
+    memoryId: string,
+    updates: Partial<{ category?: string; title?: string; body?: string }>,
+  ) => {
+    // Atualizar metadados via hook
+    if (updates.category !== undefined) {
+      updateMetadata(memoryId, { category: updates.category });
     }
-
-    const newIds = new Set<string>();
-    currentIds.forEach((id) => {
-      if (!previousIds.has(id)) {
-        newIds.add(id);
-      }
-    });
-
-    previousMemoryIdsRef.current = currentIds;
-    newMemoryIdsRef.current = newIds;
-
-    if (newIds.size > 0) {
-      const timeout = setTimeout(() => {
-        newMemoryIdsRef.current.clear();
-      }, 500);
-      return () => clearTimeout(timeout);
-    }
-  }, [actionMemories]);
+    // Nota: title e body não são salvos no backend ainda, apenas localmente via metadados
+    // Isso pode ser estendido no futuro para salvar no backend
+  };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-gray-50/50 to-white">
-      {/* Header com glassmorphism */}
-      <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-gray-200/50">
-        <div className="px-6 py-6">
-          <div className="max-w-3xl mx-auto">
-            {/* Título e contador */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-3xl font-semibold text-text-primary mb-1">
-                  Memórias
-                </h1>
-                <p className="text-sm text-text-secondary/60">
-                  {actionMemories.length} {actionMemories.length === 1 ? 'registro' : 'registros'} organizados
-                </p>
+    <div className="flex-1 flex flex-col overflow-hidden bg-background dark:bg-background-dark">
+      <AnimatePresence mode="wait">
+        {activeSpace === null ? (
+          // Tela raiz: Biblioteca Silenciosa
+          <motion.div
+            key="library"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="flex-1 overflow-y-auto pb-24 bg-gradient-to-b from-background via-background to-background/95 dark:from-background-dark dark:via-background-dark dark:to-background-dark/95"
+          >
+            {/* Header emocional centralizado */}
+            <div className="px-4 py-24 flex flex-col items-center justify-center text-center">
+              {/* Ícone do Lumeo - mais sutil e contemplativo */}
+              <div className="w-16 h-16 bg-blue-primary/3 dark:bg-blue-primary/8 rounded-full flex items-center justify-center mb-5">
+                <Sparkles
+                  className="w-8 h-8 text-blue-primary/12 dark:text-blue-primary/25"
+                  strokeWidth={1.5}
+                />
               </div>
-              <div className="flex items-center gap-2">
-                {/* Botão de busca */}
-                <button className="p-3 bg-white rounded-2xl border border-gray-200/50 hover:bg-gray-50 transition-all shadow-sm active:scale-95">
-                  <Search className="w-5 h-5 text-text-secondary" strokeWidth={2} />
-                </button>
-                {/* Botão de filtro */}
-                <button className="p-3 bg-white rounded-2xl border border-gray-200/50 hover:bg-gray-50 transition-all shadow-sm active:scale-95">
-                  <Filter className="w-5 h-5 text-text-secondary" strokeWidth={2} />
-                </button>
-              </div>
+
+              <h1
+                className="text-2xl text-text-primary dark:text-text-primary-dark mb-2 leading-relaxed"
+                style={{ fontWeight: 500, letterSpacing: '-0.02em' }}
+              >
+                Suas Memórias
+              </h1>
+              <p
+                className="text-sm text-text-secondary/40 dark:text-text-secondary-dark/40 leading-relaxed max-w-xs mx-auto"
+                style={{ letterSpacing: '0.01em', fontWeight: 400 }}
+              >
+                Um lugar seguro para tudo o que você confia ao Lumeo.
+              </p>
             </div>
 
-            {/* Stats cards - iOS style */}
-            {actionMemories.length > 0 && (
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-2xl border border-blue-200/30">
-                  <p className="text-2xl font-semibold text-blue-600 mb-1">
-                    {actionMemories.filter(m => m.interpretation?.action_type === 'task').length}
-                  </p>
-                  <p className="text-xs text-blue-600/70 font-medium">Tarefas</p>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-green-50 to-green-100/50 rounded-2xl border border-green-200/30">
-                  <p className="text-2xl font-semibold text-green-600 mb-1">
-                    {actionMemories.filter(m => m.interpretation?.action_type === 'note').length}
-                  </p>
-                  <p className="text-xs text-green-600/70 font-medium">Notas</p>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100/50 rounded-2xl border border-purple-200/30">
-                  <p className="text-2xl font-semibold text-purple-600 mb-1">
-                    {actionMemories.filter(m => m.interpretation?.action_type === 'reminder').length}
-                  </p>
-                  <p className="text-xs text-purple-600/70 font-medium">Lembretes</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Conteúdo com scroll */}
-      <div className="flex-1 overflow-y-auto">
-        {actionMemories.length === 0 ? (
-          <MemoriesEmptyState />
-        ) : (
-          <div className="px-6 py-8">
-            <div className="max-w-3xl mx-auto space-y-12">
-              {groupedMemories.map((group) => (
-                <div key={group.period} className="space-y-4">
-                  {/* Header do período com glassmorphism */}
-                  <div className="sticky top-0 z-10 py-3 -mx-2 px-2">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/90 backdrop-blur-xl rounded-full border border-gray-200/50 shadow-sm">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-500" strokeWidth={2} />
-                      <h2 className="text-sm font-semibold text-text-primary">
-                        {group.period}
-                      </h2>
-                      <span className="text-xs text-text-secondary/60">
-                        {group.memories.length}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Cards de memória com espaçamento generoso */}
-                  <div className="space-y-3">
-                    {group.memories.map((memory) => (
-                      <MemoryListCard
-                        key={memory.id}
-                        memory={memory}
-                        isNew={newMemoryIdsRef.current.has(memory.id)}
+            {/* Memory Spaces */}
+            {actionMemories.length === 0 ? (
+              <MemoriesEmptyState
+                memorySpaces={memorySpaces}
+                onSpaceClick={(spaceId) => setActiveSpace(spaceId)}
+              />
+            ) : (
+              <div className="px-4 pb-12">
+                {/* Pausa visual antes do conteúdo */}
+                <div className="max-w-md mx-auto pt-12">
+                  <div className="space-y-8">
+                    {memorySpaces.map((space) => (
+                      <MemorySpaceCard
+                        key={space.spaceId}
+                        spaceId={space.spaceId}
+                        title={space.title}
+                        icon={space.icon}
+                        count={space.memories.length}
+                        preview={space.preview}
+                        isEmpty={space.memories.length === 0}
+                        onClick={() => {
+                          if (space.memories.length > 0) {
+                            setActiveSpace(space.spaceId);
+                          }
+                        }}
                       />
                     ))}
                   </div>
                 </div>
-              ))}
-
-              {/* Footer motivacional */}
-              <div className="text-center py-8">
-                <div className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-full border border-gray-200/30">
-                  <Sparkles className="w-4 h-4 text-blue-500" strokeWidth={2} />
-                  <p className="text-sm text-text-secondary/70">
-                    Todas as memórias organizadas
-                  </p>
-                </div>
               </div>
-            </div>
-          </div>
+            )}
+          </motion.div>
+        ) : (
+          // Sub-tela: Detalhes do espaço
+          activeSpaceData && (
+            <MemorySpaceDetail
+              key={activeSpace}
+              spaceId={activeSpaceData.spaceId}
+              title={activeSpaceData.title}
+              memories={activeSpaceData.memories}
+              onBack={() => setActiveSpace(null)}
+              onMemoryClick={handleMemoryClick}
+              filterSheetOpen={filterSheetOpen}
+              onFilterSheetOpenChange={setFilterSheetOpen}
+              filters={filters}
+              onFiltersChange={setFilters}
+            />
+          )
         )}
-      </div>
+      </AnimatePresence>
+
+      {/* MemoryDetailSheet */}
+      <MemoryDetailSheet
+        memory={selectedMemory}
+        open={detailSheetOpen}
+        onOpenChange={setDetailSheetOpen}
+        onUpdate={handleMemoryUpdate}
+      />
     </div>
   );
 }
