@@ -13,7 +13,7 @@
  * - Memórias: Timeline completa de todas as memórias registradas
  * - Você: Perfil, configurações e estatísticas do usuário
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -23,8 +23,11 @@ import { AppHeader } from './components/layout/AppHeader';
 import { MemoriesPage } from './pages/MemoriesPage';
 import { MemoriesListPage } from './pages/MemoriesListPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { CategoriesPage } from './pages/CategoriesPage';
 import { PageTransition } from './components/ui/PageTransition';
-import type { MemoryEntry } from './components/MemoryTimeline';
+import { GlobalSearch } from './components/GlobalSearch';
+import { MemoryDetailSheet } from './components/memories/MemoryDetailSheet';
+import type { MemoryEntry, ExtendedMemoryEntry } from './components/MemoryTimeline';
 import type { TabId } from './components/navigation/TabBar';
 import { LoginForm } from './components/LoginForm';
 import { RegisterForm } from './components/RegisterForm';
@@ -33,19 +36,82 @@ import {
   type MemoryInterpretationResponse,
   confirmInteraction,
   rejectInteraction,
+  listMemories,
+  completeReminder,
+  setMemoryCategory,
 } from './services/api';
 
 function MemoryInterface() {
   const { accessToken, user, logout: handleLogout, refreshAccessToken } = useAuth();
-  const [memories, setMemories] = useState<MemoryEntry[]>([]);
+  // Separar memórias do backend (salvas) das memórias locais (em processo)
+  const [backendMemories, setBackendMemories] = useState<MemoryEntry[]>([]);
+  const [localMemories, setLocalMemories] = useState<MemoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [confirmingIds, setConfirmingIds] = useState<Set<string>>(new Set());
   const [highlightInput, setHighlightInput] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('capture');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedMemory, setSelectedMemory] = useState<ExtendedMemoryEntry | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const [showCategories, setShowCategories] = useState(false);
 
   const handleTabChange = (tab: TabId) => {
     setActiveTab(tab);
   };
+
+  // Carregar memórias do backend quando o app abre (não depende da aba ativa)
+  useEffect(() => {
+    const fetchBackendMemories = async () => {
+      if (!accessToken) {
+        return;
+      }
+
+      try {
+        const backendData = await listMemories(accessToken, 'all', refreshAccessToken);
+        
+        // Converter MemoryResponse para MemoryEntry
+        const convertedMemories: MemoryEntry[] = backendData.map((mem) => ({
+          id: mem.id,
+          type: 'assistant' as const,
+          content: mem.content,
+          interpretation: mem.interpretation,
+          timestamp: new Date(mem.timestamp),
+          metadata: mem.metadata
+            ? {
+                completed: mem.metadata.completed,
+                completedAt: mem.metadata.completedAt ? new Date(mem.metadata.completedAt) : undefined,
+                isFavorite: mem.metadata.isFavorite,
+                isPinned: mem.metadata.isPinned,
+                category: mem.metadata.category?.id || undefined,
+              }
+            : undefined,
+        }));
+
+        setBackendMemories(convertedMemories);
+      } catch (error) {
+        console.error('Erro ao buscar memórias:', error);
+        // Não mostrar erro ao usuário - interface silenciosa
+      }
+    };
+
+    fetchBackendMemories();
+  }, [accessToken, refreshAccessToken]);
+
+  // Memórias para a tela de captura: apenas locais (user, loading, não confirmadas)
+  const captureMemories = useMemo(() => {
+    return localMemories.filter(
+      (m) => 
+        m.type === 'user' || 
+        m.type === 'loading' || 
+        (m.type === 'assistant' && m.needsConfirmation === true)
+    );
+  }, [localMemories]);
+
+  // Memórias para a tela de memórias: backend + locais (removendo duplicatas)
+  const allMemories = useMemo(() => {
+    const combined = [...backendMemories, ...localMemories];
+    return Array.from(new Map(combined.map((m) => [m.id, m])).values());
+  }, [backendMemories, localMemories]);
 
   const handleSave = useCallback(
     async (text: string) => {
@@ -61,7 +127,7 @@ function MemoryInterface() {
         timestamp: new Date(),
       };
 
-      setMemories((prev) => [...prev, userInput]);
+      setLocalMemories((prev) => [...prev, userInput]);
       setIsLoading(true);
 
       // Adicionar indicador de processamento
@@ -71,7 +137,7 @@ function MemoryInterface() {
         timestamp: new Date(),
       };
 
-      setMemories((prev) => [...prev, processingIndicator]);
+      setLocalMemories((prev) => [...prev, processingIndicator]);
 
       try {
         // Chamar API com token de autenticação e função de refresh
@@ -82,7 +148,7 @@ function MemoryInterface() {
         );
 
         // Remover indicador de processamento e adicionar resposta do assistente
-        setMemories((prev) => {
+        setLocalMemories((prev) => {
           const withoutLoading = prev.filter((msg) => msg.id !== processingIndicator.id);
 
           // Se a IA não conseguiu classificar (unknown), tratar como nota genérica
@@ -115,7 +181,7 @@ function MemoryInterface() {
         });
       } catch (error) {
         // Remover indicador de processamento
-        setMemories((prev) => {
+        setLocalMemories((prev) => {
           const withoutLoading = prev.filter((msg) => msg.id !== processingIndicator.id);
 
           const errorMessage =
@@ -153,7 +219,7 @@ function MemoryInterface() {
   );
 
   const handleConfirm = useCallback(
-    async (interactionId: string) => {
+    async (interactionId: string, categoryId?: string) => {
       if (!accessToken) return;
 
       setConfirmingIds((prev) => new Set(prev).add(interactionId));
@@ -161,8 +227,29 @@ function MemoryInterface() {
       try {
         await confirmInteraction(accessToken, interactionId, refreshAccessToken);
 
-        // Atualizar memória para remover botões de confirmação
-        setMemories((prev) =>
+        // Encontrar a memória para obter o tipo (buscar em localMemories primeiro, depois em allMemories)
+        const memory = localMemories.find((m) => m.interactionId === interactionId) || 
+                       allMemories.find((m) => m.interactionId === interactionId);
+        const actionType = memory?.interpretation?.action_type;
+
+        // Se categoria foi selecionada e temos um tipo válido, salvar categoria
+        if (categoryId && actionType && actionType !== 'unknown' && memory?.id) {
+          try {
+            await setMemoryCategory(
+              accessToken,
+              memory.id,
+              actionType as 'task' | 'note' | 'reminder',
+              categoryId,
+              refreshAccessToken,
+            );
+          } catch (error) {
+            // Erro ao salvar categoria não deve quebrar o fluxo
+            console.error('Erro ao salvar categoria:', error);
+          }
+        }
+
+        // Atualizar memória local para remover botões de confirmação
+        setLocalMemories((prev) =>
           prev.map((memory) => {
             if (memory.interactionId === interactionId) {
               return {
@@ -178,6 +265,42 @@ function MemoryInterface() {
           }),
         );
 
+        // Refetch do backend para atualizar memórias salvas
+        // A memória confirmada agora está no backend
+        try {
+          const backendData = await listMemories(accessToken, 'all', refreshAccessToken);
+          const convertedMemories: MemoryEntry[] = backendData.map((mem) => ({
+            id: mem.id,
+            type: 'assistant' as const,
+            content: mem.content,
+            interpretation: mem.interpretation,
+            timestamp: new Date(mem.timestamp),
+            metadata: mem.metadata
+              ? {
+                  completed: mem.metadata.completed,
+                  completedAt: mem.metadata.completedAt ? new Date(mem.metadata.completedAt) : undefined,
+                  isFavorite: mem.metadata.isFavorite,
+                  isPinned: mem.metadata.isPinned,
+                  category: mem.metadata.category?.id || undefined,
+                }
+              : undefined,
+          }));
+          setBackendMemories(convertedMemories);
+          
+          // Remover da localMemories se já estiver no backend
+          const backendIds = new Set(backendData.map((bm) => bm.id));
+          setLocalMemories((prev) =>
+            prev.filter((m) => {
+              // Manter user, loading, e memórias não salvas ainda
+              if (m.type === 'user' || m.type === 'loading') return true;
+              // Remover se já está no backend
+              return !backendIds.has(m.id);
+            })
+          );
+        } catch (error) {
+          console.error('Erro ao atualizar memórias após confirmação:', error);
+        }
+
         // Não adicionar mensagem extra - o cartão já mostra "Registrado"
         // Interface permanece silenciosa e confiante
       } catch (error) {
@@ -190,6 +313,60 @@ function MemoryInterface() {
           next.delete(interactionId);
           return next;
         });
+      }
+    },
+    [accessToken, refreshAccessToken, localMemories, allMemories],
+  );
+
+  const handleCompleteReminder = useCallback(
+    async (reminderId: string) => {
+      if (!accessToken) return;
+
+      try {
+        await completeReminder(accessToken, reminderId);
+        
+        // Atualizar memória do backend para marcar como concluída
+        setBackendMemories((prev) =>
+          prev.map((memory) => {
+            if (memory.id === reminderId) {
+              return {
+                ...memory,
+                metadata: {
+                  ...memory.metadata,
+                  completed: true,
+                  completedAt: new Date(),
+                },
+              };
+            }
+            return memory;
+          }),
+        );
+
+        // Refetch do backend para garantir sincronização
+        try {
+          const backendData = await listMemories(accessToken, 'all', refreshAccessToken);
+          const convertedMemories: MemoryEntry[] = backendData.map((mem) => ({
+            id: mem.id,
+            type: 'assistant' as const,
+            content: mem.content,
+            interpretation: mem.interpretation,
+            timestamp: new Date(mem.timestamp),
+            metadata: mem.metadata
+              ? {
+                  completed: mem.metadata.completed,
+                  completedAt: mem.metadata.completedAt ? new Date(mem.metadata.completedAt) : undefined,
+                  isFavorite: mem.metadata.isFavorite,
+                  isPinned: mem.metadata.isPinned,
+                  category: mem.metadata.category?.id || undefined,
+                }
+              : undefined,
+          }));
+          setBackendMemories(convertedMemories);
+        } catch (error) {
+          console.error('Erro ao atualizar memórias após completar lembrete:', error);
+        }
+      } catch (error) {
+        console.error('Erro ao completar lembrete:', error);
       }
     },
     [accessToken, refreshAccessToken],
@@ -295,7 +472,7 @@ function MemoryInterface() {
           {activeTab === 'capture' && (
             <PageTransition key="capture">
               <MemoriesPage
-                memories={memories}
+                memories={captureMemories}
                 onSave={handleSave}
                 onConfirm={handleConfirm}
                 onReject={handleReject}
@@ -309,16 +486,109 @@ function MemoryInterface() {
           )}
           {activeTab === 'memories' && (
             <PageTransition key="memories">
-              <MemoriesListPage memories={memories} />
+              <MemoriesListPage 
+                memories={allMemories} 
+                onCompleteReminder={handleCompleteReminder}
+                onMemoryUpdate={async () => {
+                  // Refetch memories após toggle
+                  if (accessToken) {
+                    try {
+                      const backendData = await listMemories(accessToken, 'all', refreshAccessToken);
+                      const convertedMemories: MemoryEntry[] = backendData.map((mem) => ({
+                        id: mem.id,
+                        type: 'assistant' as const,
+                        content: mem.content,
+                        interpretation: mem.interpretation,
+                        timestamp: new Date(mem.timestamp),
+                        metadata: mem.metadata
+                          ? {
+                              completed: mem.metadata.completed,
+                              completedAt: mem.metadata.completedAt ? new Date(mem.metadata.completedAt) : undefined,
+                              isFavorite: mem.metadata.isFavorite,
+                              isPinned: mem.metadata.isPinned,
+                              category: mem.metadata.category?.id || undefined,
+                            }
+                          : undefined,
+                      }));
+                      
+                      setBackendMemories(convertedMemories);
+                    } catch (error) {
+                      console.error('Erro ao atualizar memórias:', error);
+                    }
+                  }
+                }}
+              />
             </PageTransition>
           )}
-          {activeTab === 'profile' && (
+          {activeTab === 'profile' && !showCategories && (
             <PageTransition key="profile">
-              <ProfilePage user={user || undefined} onLogout={handleLogout} memories={memories} />
+              <ProfilePage
+                user={user || undefined}
+                onLogout={handleLogout}
+                memories={allMemories}
+                onNavigateToCategories={() => setShowCategories(true)}
+              />
+            </PageTransition>
+          )}
+          {activeTab === 'profile' && showCategories && (
+            <PageTransition key="categories">
+              <CategoriesPage onBack={() => setShowCategories(false)} />
             </PageTransition>
           )}
         </AnimatePresence>
       </MainContent>
+
+      {/* Global Search */}
+      <GlobalSearch
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        onSelectMemory={(memory) => {
+          setSelectedMemory(memory as ExtendedMemoryEntry);
+          setDetailSheetOpen(true);
+        }}
+      />
+
+      {/* Memory Detail Sheet (para busca) */}
+      {selectedMemory && (
+        <MemoryDetailSheet
+          memory={selectedMemory}
+          open={detailSheetOpen}
+          onOpenChange={(open) => {
+            setDetailSheetOpen(open);
+            if (!open) {
+              setSelectedMemory(null);
+            }
+          }}
+          onUpdate={async (memoryId, updates) => {
+            // Atualizar memória do backend se necessário
+            // Refetch para garantir sincronização
+            if (accessToken) {
+              try {
+                const backendData = await listMemories(accessToken, 'all', refreshAccessToken);
+                const convertedMemories: MemoryEntry[] = backendData.map((mem) => ({
+                  id: mem.id,
+                  type: 'assistant' as const,
+                  content: mem.content,
+                  interpretation: mem.interpretation,
+                  timestamp: new Date(mem.timestamp),
+                  metadata: mem.metadata
+                    ? {
+                        completed: mem.metadata.completed,
+                        completedAt: mem.metadata.completedAt ? new Date(mem.metadata.completedAt) : undefined,
+                        isFavorite: mem.metadata.isFavorite,
+                        isPinned: mem.metadata.isPinned,
+                        category: mem.metadata.category?.id || undefined,
+                      }
+                    : undefined,
+                }));
+                setBackendMemories(convertedMemories);
+              } catch (error) {
+                console.error('Erro ao atualizar memórias:', error);
+              }
+            }
+          }}
+        />
+      )}
     </BaseLayout>
   );
 }
