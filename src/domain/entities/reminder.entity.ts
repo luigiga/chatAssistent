@@ -19,6 +19,8 @@ export class Reminder {
     public readonly isRecurring: boolean = false,
     public readonly recurrenceRule?: RecurrenceRule,
     public readonly completed: boolean = false,
+    public readonly isFavorite: boolean = false,
+    public readonly isPinned: boolean = false,
     public readonly createdAt?: Date,
     public readonly updatedAt?: Date,
     public readonly completedAt?: Date,
@@ -44,7 +46,9 @@ export class Reminder {
       description,
       isRecurring,
       recurrenceRule,
-      false,
+      false, // completed
+      false, // isFavorite
+      false, // isPinned
       new Date(),
       new Date(),
     );
@@ -63,6 +67,8 @@ export class Reminder {
       this.isRecurring,
       this.recurrenceRule,
       true,
+      this.isFavorite,
+      this.isPinned,
       this.createdAt,
       new Date(),
       new Date(),
@@ -88,6 +94,44 @@ export class Reminder {
       isRecurring !== undefined ? isRecurring : this.isRecurring,
       recurrenceRule !== undefined ? recurrenceRule : this.recurrenceRule,
       this.completed,
+      this.isFavorite,
+      this.isPinned,
+      this.createdAt,
+      new Date(),
+      this.completedAt,
+    );
+  }
+
+  toggleFavorite(): Reminder {
+    return new Reminder(
+      this.id,
+      this.userId,
+      this.title,
+      this.reminderDate,
+      this.description,
+      this.isRecurring,
+      this.recurrenceRule,
+      this.completed,
+      !this.isFavorite,
+      this.isPinned,
+      this.createdAt,
+      new Date(),
+      this.completedAt,
+    );
+  }
+
+  togglePin(): Reminder {
+    return new Reminder(
+      this.id,
+      this.userId,
+      this.title,
+      this.reminderDate,
+      this.description,
+      this.isRecurring,
+      this.recurrenceRule,
+      this.completed,
+      this.isFavorite,
+      !this.isPinned,
       this.createdAt,
       new Date(),
       this.completedAt,

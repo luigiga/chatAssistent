@@ -23,10 +23,12 @@ model User {
   tasks          Task[]
   notes          Note[]
   reminders      Reminder[]
+  categories     Category[]
   refreshTokens  RefreshToken[]
   auditLogs      AuditLog[]
   aiInteractions AIInteraction[]
   aiQuotaUsage   AIQuotaUsage[]
+  notifications  Notification[]
 
   @@map("users")
 }
@@ -47,6 +49,24 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+// Categoria
+model Category {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  color     String   // Cor em hex (ex: "#3B82F6")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks Task[]
+  notes Note[]
+  reminders Reminder[]
+
+  @@index([userId])
+  @@map("categories")
+}
+
 // Tarefa
 model Task {
   id          String   @id @default(uuid())
@@ -56,14 +76,21 @@ model Task {
   completed   Boolean  @default(false)
   dueDate     DateTime? @map("due_date")
   priority    String?  // 'low', 'medium', 'high'
+  isFavorite  Boolean  @default(false) @map("is_favorite")
+  isPinned    Boolean  @default(false) @map("is_pinned")
+  categoryId  String?  @map("category_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   completedAt DateTime? @map("completed_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userId, completed])
+  @@index([userId, isFavorite])
+  @@index([userId, isPinned])
+  @@index([categoryId])
   @@map("tasks")
 }
 
@@ -73,12 +100,19 @@ model Note {
   userId    String   @map("user_id")
   title     String?
   content   String
+  isFavorite Boolean @default(false) @map("is_favorite")
+  isPinned   Boolean @default(false) @map("is_pinned")
+  categoryId String? @map("category_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([userId, isFavorite])
+  @@index([userId, isPinned])
+  @@index([categoryId])
   @@map("notes")
 }
 
@@ -92,14 +126,21 @@ model Reminder {
   isRecurring  Boolean  @default(false) @map("is_recurring")
   recurrenceRule String? @map("recurrence_rule") // Ex: "daily", "weekly", "monthly"
   completed    Boolean  @default(false)
+  isFavorite   Boolean  @default(false) @map("is_favorite")
+  isPinned     Boolean  @default(false) @map("is_pinned")
+  categoryId   String?  @map("category_id")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   completedAt  DateTime? @map("completed_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userId, reminderDate])
+  @@index([userId, isFavorite])
+  @@index([userId, isPinned])
+  @@index([categoryId])
   @@map("reminders")
 }
 
@@ -152,5 +193,25 @@ model AIQuotaUsage {
   @@unique([userId, date])
   @@index([userId, date])
   @@map("ai_quota_usage")
+}
+
+// Notificação
+model Notification {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  kind       String    // 'REMINDER_DUE' | 'TASK_DUE'
+  title      String
+  body       String
+  entityType String    @map("entity_type") // 'Task' | 'Reminder'
+  entityId   String    @map("entity_id")
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, readAt])
+  @@index([entityType, entityId])
+  @@map("notifications")
 }
 

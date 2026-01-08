@@ -14,6 +14,7 @@ import { PrismaService } from '@infrastructure/database/prisma.service';
 import { AIRateLimiter } from '@infrastructure/ai/ai-rate-limiter.service';
 import { AICacheService } from '@infrastructure/ai/ai-cache.service';
 import { CircuitBreakerService } from '@infrastructure/ai/circuit-breaker.service';
+import { DateHeuristicService } from '@infrastructure/ai/date-heuristic.service';
 import {
   AI_PROVIDER,
   AI_INTERACTION_REPOSITORY,
@@ -35,6 +36,7 @@ import { RemindersModule } from './reminders.module';
     AIRateLimiter,
     AICacheService,
     CircuitBreakerService,
+    DateHeuristicService,
     {
       provide: AI_PROVIDER,
       useFactory: (

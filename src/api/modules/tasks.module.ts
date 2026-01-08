@@ -33,7 +33,7 @@ import { AuthModule } from './auth.module';
     },
     PrismaService,
   ],
-  exports: [TASK_REPOSITORY, CreateTaskUseCase],
+  exports: [TASK_REPOSITORY, CreateTaskUseCase, ListTasksUseCase],
 })
 export class TasksModule {}
 

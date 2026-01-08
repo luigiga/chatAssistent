@@ -8,6 +8,7 @@ import { ListRemindersUseCase } from '@application/use-cases/reminders/list-remi
 import { UpdateReminderUseCase } from '@application/use-cases/reminders/update-reminder.use-case';
 import { DeleteReminderUseCase } from '@application/use-cases/reminders/delete-reminder.use-case';
 import { CompleteReminderUseCase } from '@application/use-cases/reminders/complete-reminder.use-case';
+import { UndoneReminderUseCase } from '@application/use-cases/reminders/undone-reminder.use-case';
 import { PrismaReminderRepository } from '@infrastructure/repositories/prisma-reminder.repository';
 import { PrismaUserRepository } from '@infrastructure/repositories/prisma-user.repository';
 import { PrismaService } from '@infrastructure/database/prisma.service';
@@ -23,6 +24,7 @@ import { AuthModule } from './auth.module';
     UpdateReminderUseCase,
     DeleteReminderUseCase,
     CompleteReminderUseCase,
+    UndoneReminderUseCase,
     {
       provide: REMINDER_REPOSITORY,
       useClass: PrismaReminderRepository,
@@ -33,6 +35,6 @@ import { AuthModule } from './auth.module';
     },
     PrismaService,
   ],
-  exports: [REMINDER_REPOSITORY, CreateReminderUseCase],
+  exports: [REMINDER_REPOSITORY, CreateReminderUseCase, ListRemindersUseCase],
 })
 export class RemindersModule {}

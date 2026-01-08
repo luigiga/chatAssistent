@@ -27,6 +27,10 @@ import { CategoriesPage } from './pages/CategoriesPage';
 import { PageTransition } from './components/ui/PageTransition';
 import { GlobalSearch } from './components/GlobalSearch';
 import { MemoryDetailSheet } from './components/memories/MemoryDetailSheet';
+import { NotificationBell } from './components/notifications/NotificationBell';
+import { NotificationSheet } from './components/notifications/NotificationSheet';
+import { Toaster } from './components/ui/toaster';
+import { useNotifications } from './hooks/useNotifications';
 import type { MemoryEntry, ExtendedMemoryEntry } from './components/MemoryTimeline';
 import type { TabId } from './components/navigation/TabBar';
 import { LoginForm } from './components/LoginForm';
@@ -39,6 +43,7 @@ import {
   listMemories,
   completeReminder,
   setMemoryCategory,
+  type Notification,
 } from './services/api';
 
 function MemoryInterface() {
@@ -54,6 +59,14 @@ function MemoryInterface() {
   const [selectedMemory, setSelectedMemory] = useState<ExtendedMemoryEntry | null>(null);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [showCategories, setShowCategories] = useState(false);
+  const [notificationSheetOpen, setNotificationSheetOpen] = useState(false);
+
+  // Hook de notificações com polling
+  const { unreadCount, notifications, markAsRead, snooze } = useNotifications(
+    accessToken,
+    refreshAccessToken,
+    notificationSheetOpen, // Passar estado do sheet para silenciar toasts quando aberto
+  );
 
   const handleTabChange = (tab: TabId) => {
     setActiveTab(tab);
@@ -452,6 +465,12 @@ function MemoryInterface() {
         actions={
           activeTab === 'profile' ? undefined : (
             <>
+              {accessToken && (
+                <NotificationBell
+                  unreadCount={unreadCount}
+                  onClick={() => setNotificationSheetOpen(true)}
+                />
+              )}
               {user && (
                 <span className="text-sm text-text-secondary">{user.name || user.email}</span>
               )}
@@ -589,6 +608,58 @@ function MemoryInterface() {
           }}
         />
       )}
+
+      {/* Notification Sheet */}
+      {accessToken && (
+        <NotificationSheet
+          open={notificationSheetOpen}
+          onOpenChange={setNotificationSheetOpen}
+          notifications={notifications}
+          onMarkAsRead={markAsRead}
+          onSnooze={snooze}
+          onNotificationClick={async (notification: Notification) => {
+            // Buscar memória relacionada
+            if (!accessToken) return;
+
+            try {
+              const backendData = await listMemories(accessToken, 'all', refreshAccessToken);
+              
+              // Encontrar memória pelo entityId
+              const relatedMemory = backendData.find((mem) => mem.id === notification.entityId);
+              
+              if (relatedMemory) {
+                const convertedMemory: ExtendedMemoryEntry = {
+                  id: relatedMemory.id,
+                  type: 'assistant' as const,
+                  content: relatedMemory.content,
+                  interpretation: relatedMemory.interpretation,
+                  timestamp: new Date(relatedMemory.timestamp),
+                  metadata: relatedMemory.metadata
+                    ? {
+                        completed: relatedMemory.metadata.completed,
+                        completedAt: relatedMemory.metadata.completedAt
+                          ? new Date(relatedMemory.metadata.completedAt)
+                          : undefined,
+                        isFavorite: relatedMemory.metadata.isFavorite,
+                        isPinned: relatedMemory.metadata.isPinned,
+                        category: relatedMemory.metadata.category?.id || undefined,
+                      }
+                    : undefined,
+                };
+                
+                setSelectedMemory(convertedMemory);
+                setDetailSheetOpen(true);
+                setNotificationSheetOpen(false);
+              }
+            } catch (error) {
+              console.error('Erro ao buscar memória relacionada:', error);
+            }
+          }}
+        />
+      )}
+
+      {/* Toaster para toasts */}
+      <Toaster />
     </BaseLayout>
   );
 }

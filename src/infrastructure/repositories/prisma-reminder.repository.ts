@@ -21,6 +21,9 @@ export class PrismaReminderRepository implements ReminderRepository {
         isRecurring: reminder.isRecurring,
         recurrenceRule: reminder.recurrenceRule,
         completed: reminder.completed,
+        isFavorite: reminder.isFavorite,
+        isPinned: reminder.isPinned,
+        categoryId: (reminder as any).categoryId,
         completedAt: reminder.completedAt,
       },
     });
@@ -31,6 +34,7 @@ export class PrismaReminderRepository implements ReminderRepository {
   async findById(id: string): Promise<Reminder | null> {
     const found = await this.prisma.reminder.findUnique({
       where: { id },
+      include: { category: true },
     });
 
     if (!found) {
@@ -43,7 +47,11 @@ export class PrismaReminderRepository implements ReminderRepository {
   async findByUserId(userId: string): Promise<Reminder[]> {
     const reminders = await this.prisma.reminder.findMany({
       where: { userId },
-      orderBy: { reminderDate: 'asc' },
+      include: { category: true },
+      orderBy: [
+        { isPinned: 'desc' },
+        { reminderDate: 'asc' },
+      ],
     });
 
     return reminders.map((reminder) => this.mapToDomain(reminder));
@@ -82,6 +90,9 @@ export class PrismaReminderRepository implements ReminderRepository {
         isRecurring: reminder.isRecurring,
         recurrenceRule: reminder.recurrenceRule,
         completed: reminder.completed,
+        isFavorite: reminder.isFavorite,
+        isPinned: reminder.isPinned,
+        categoryId: (reminder as any).categoryId,
         completedAt: reminder.completedAt,
       },
     });
@@ -95,8 +106,20 @@ export class PrismaReminderRepository implements ReminderRepository {
     });
   }
 
+  async findOverdueReminders(now: Date): Promise<Reminder[]> {
+    const reminders = await this.prisma.reminder.findMany({
+      where: {
+        reminderDate: { lte: now },
+        completed: false,
+      },
+      include: { category: true },
+    });
+
+    return reminders.map((reminder) => this.mapToDomain(reminder));
+  }
+
   private mapToDomain(prismaReminder: any): Reminder {
-    return new Reminder(
+    const reminder = new Reminder(
       prismaReminder.id,
       prismaReminder.userId,
       prismaReminder.title,
@@ -105,10 +128,16 @@ export class PrismaReminderRepository implements ReminderRepository {
       prismaReminder.isRecurring,
       prismaReminder.recurrenceRule,
       prismaReminder.completed,
+      prismaReminder.isFavorite || false,
+      prismaReminder.isPinned || false,
       prismaReminder.createdAt ? new Date(prismaReminder.createdAt) : undefined,
       prismaReminder.updatedAt ? new Date(prismaReminder.updatedAt) : undefined,
       prismaReminder.completedAt ? new Date(prismaReminder.completedAt) : undefined,
     );
+    // Adicionar categoryId e category como propriedades extras
+    (reminder as any).categoryId = prismaReminder.categoryId;
+    (reminder as any).category = prismaReminder.category;
+    return reminder;
   }
 }
 

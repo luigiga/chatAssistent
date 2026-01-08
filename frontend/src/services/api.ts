@@ -309,6 +309,386 @@ export async function listReminders(accessToken: string): Promise<Reminder[]> {
   return response.json();
 }
 
+export async function completeReminder(accessToken: string, reminderId: string): Promise<Reminder> {
+  const response = await fetch(`${API_BASE_URL}/reminders/${reminderId}/complete`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Erro ao completar lembrete');
+  }
+
+  return response.json();
+}
+
+export async function undoneReminder(accessToken: string, reminderId: string): Promise<Reminder> {
+  const response = await fetch(`${API_BASE_URL}/reminders/${reminderId}/undone`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Erro ao desfazer lembrete');
+  }
+
+  return response.json();
+}
+
+// ===== Memories (Unified) =====
+
+export interface MemoryResponse {
+  id: string;
+  type: 'task' | 'note' | 'reminder';
+  content?: string;
+  interpretation: MemoryInterpretationResponse['interpretation'];
+  timestamp: string;
+  metadata?: {
+    completed?: boolean;
+    completedAt?: string;
+    isFavorite?: boolean;
+    isPinned?: boolean;
+    category?: {
+      id: string;
+      name: string;
+      color: string;
+    };
+  };
+}
+
+export async function listMemories(
+  accessToken: string,
+  space?: 'reminders' | 'today' | 'week' | 'all',
+  refreshAccessToken?: () => Promise<string>,
+): Promise<MemoryResponse[]> {
+  const params = new URLSearchParams();
+  if (space) {
+    params.append('space', space);
+  }
+
+  let response = await fetch(`${API_BASE_URL}/memories?${params.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/memories?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${newToken}`,
+      },
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao listar memórias');
+  }
+
+  return response.json();
+}
+
+// ===== Search =====
+
+export interface SearchResult {
+  id: string;
+  type: 'task' | 'note' | 'reminder';
+  title: string;
+  snippet: string;
+  createdAt: string;
+  when?: string;
+  category?: { id: string; name: string; color: string } | null;
+}
+
+export async function searchMemories(
+  accessToken: string,
+  query: string,
+  filters?: {
+    types?: ('task' | 'note' | 'reminder')[];
+    categoryIds?: string[];
+    from?: string;
+    to?: string;
+    status?: 'open' | 'done';
+  },
+  refreshAccessToken?: () => Promise<string>,
+): Promise<SearchResult[]> {
+  const params = new URLSearchParams();
+  params.append('q', query);
+  
+  if (filters?.types && filters.types.length > 0) {
+    filters.types.forEach(type => params.append('types', type));
+  }
+  
+  if (filters?.categoryIds && filters.categoryIds.length > 0) {
+    filters.categoryIds.forEach(id => params.append('categoryIds', id));
+  }
+  
+  if (filters?.from) {
+    params.append('from', filters.from);
+  }
+  
+  if (filters?.to) {
+    params.append('to', filters.to);
+  }
+  
+  if (filters?.status) {
+    params.append('status', filters.status);
+  }
+
+  let response = await fetch(`${API_BASE_URL}/search?${params.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  // Se token expirou, tentar refresh
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/search?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${newToken}`,
+      },
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao buscar memórias');
+  }
+
+  return response.json();
+}
+
+// ===== Favorites & Pins =====
+
+export async function toggleFavorite(
+  accessToken: string,
+  memoryId: string,
+  type: 'task' | 'note' | 'reminder',
+  refreshAccessToken?: () => Promise<string>,
+): Promise<{ isFavorite: boolean }> {
+  let response = await fetch(`${API_BASE_URL}/memories/${memoryId}/favorite?type=${type}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/memories/${memoryId}/favorite?type=${type}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${newToken}`,
+      },
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao favoritar memória');
+  }
+
+  return response.json();
+}
+
+export async function togglePin(
+  accessToken: string,
+  memoryId: string,
+  type: 'task' | 'note' | 'reminder',
+  refreshAccessToken?: () => Promise<string>,
+): Promise<{ isPinned: boolean }> {
+  let response = await fetch(`${API_BASE_URL}/memories/${memoryId}/pin?type=${type}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/memories/${memoryId}/pin?type=${type}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${newToken}`,
+      },
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao fixar memória');
+  }
+
+  return response.json();
+}
+
+// ===== Categories =====
+
+export interface Category {
+  id: string;
+  name: string;
+  color: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function listCategories(
+  accessToken: string,
+  refreshAccessToken?: () => Promise<string>,
+): Promise<Category[]> {
+  let response = await fetch(`${API_BASE_URL}/categories`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/categories`, {
+      headers: {
+        Authorization: `Bearer ${newToken}`,
+      },
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao listar categorias');
+  }
+
+  return response.json();
+}
+
+export async function createCategory(
+  accessToken: string,
+  name: string,
+  color: string,
+  refreshAccessToken?: () => Promise<string>,
+): Promise<Category> {
+  let response = await fetch(`${API_BASE_URL}/categories`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ name, color }),
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/categories`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${newToken}`,
+      },
+      body: JSON.stringify({ name, color }),
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao criar categoria');
+  }
+
+  return response.json();
+}
+
+export async function updateCategory(
+  accessToken: string,
+  id: string,
+  name: string,
+  color: string,
+  refreshAccessToken?: () => Promise<string>,
+): Promise<Category> {
+  let response = await fetch(`${API_BASE_URL}/categories/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ name, color }),
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/categories/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${newToken}`,
+      },
+      body: JSON.stringify({ name, color }),
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao atualizar categoria');
+  }
+
+  return response.json();
+}
+
+export async function deleteCategory(
+  accessToken: string,
+  id: string,
+  refreshAccessToken?: () => Promise<string>,
+): Promise<void> {
+  let response = await fetch(`${API_BASE_URL}/categories/${id}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/categories/${id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${newToken}`,
+      },
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao deletar categoria');
+  }
+}
+
+export async function setMemoryCategory(
+  accessToken: string,
+  memoryId: string,
+  type: 'task' | 'note' | 'reminder',
+  categoryId: string | null,
+  refreshAccessToken?: () => Promise<string>,
+): Promise<void> {
+  let response = await fetch(`${API_BASE_URL}/memories/${memoryId}/category?type=${type}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ categoryId }),
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/memories/${memoryId}/category?type=${type}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${newToken}`,
+      },
+      body: JSON.stringify({ categoryId }),
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao atribuir categoria');
+  }
+}
+
 // ===== Interactions (Confirmação de Ações Pendentes) =====
 
 export interface PendingInteraction {
@@ -430,4 +810,174 @@ export async function rejectInteraction(
   };
 
   return makeRequest(accessToken);
+}
+
+/**
+ * Interface de Notificação
+ */
+export interface Notification {
+  id: string;
+  kind: 'REMINDER_DUE' | 'TASK_DUE';
+  title: string;
+  body: string;
+  entityType: 'Task' | 'Reminder';
+  entityId: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * Lista notificações do usuário
+ */
+export async function listNotifications(
+  accessToken: string,
+  unreadOnly?: boolean,
+  refreshAccessToken?: () => Promise<string>,
+): Promise<Notification[]> {
+  const params = new URLSearchParams();
+  if (unreadOnly) {
+    params.append('unread', 'true');
+  }
+
+  let response = await fetch(`${API_BASE_URL}/notifications?${params.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/notifications?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${newToken}`,
+      },
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao listar notificações');
+  }
+
+  return response.json();
+}
+
+/**
+ * Marca uma notificação como lida
+ */
+export async function markNotificationRead(
+  accessToken: string,
+  notificationId: string,
+  refreshAccessToken?: () => Promise<string>,
+): Promise<void> {
+  let response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${newToken}`,
+      },
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao marcar notificação como lida');
+  }
+}
+
+/**
+ * Busca contagem de notificações não lidas
+ */
+export async function getUnreadCount(
+  accessToken: string,
+  refreshAccessToken?: () => Promise<string>,
+): Promise<number> {
+  let response = await fetch(`${API_BASE_URL}/notifications/unread/count`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/notifications/unread/count`, {
+      headers: {
+        Authorization: `Bearer ${newToken}`,
+      },
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error('Erro ao buscar contagem de não lidas');
+  }
+
+  const data = await response.json();
+  return data.count;
+}
+
+/**
+ * Interface para requisição de snooze
+ */
+export interface SnoozeNotificationRequest {
+  mode: 'minutes' | 'until' | 'tomorrow_9';
+  minutes?: number;
+  until?: string;
+}
+
+/**
+ * Interface para resposta de snooze
+ */
+export interface SnoozeNotificationResponse {
+  notification: Notification;
+  updatedEntitySummary: {
+    id: string;
+    type: 'Task' | 'Reminder';
+    newDate: string;
+  };
+}
+
+/**
+ * Adia (snooze) uma notificação
+ */
+export async function snoozeNotification(
+  accessToken: string,
+  notificationId: string,
+  request: SnoozeNotificationRequest,
+  refreshAccessToken?: () => Promise<string>,
+): Promise<SnoozeNotificationResponse> {
+  let response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/snooze`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (response.status === 401 && refreshAccessToken) {
+    const newToken = await refreshAccessToken();
+    response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/snooze`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${newToken}`,
+      },
+      body: JSON.stringify(request),
+    });
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({
+      message: `Erro ${response.status}: ${response.statusText}`,
+    }));
+    throw new Error(errorData.message || 'Erro ao adiar notificação');
+  }
+
+  return response.json();
 }

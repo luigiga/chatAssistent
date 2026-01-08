@@ -5,13 +5,14 @@
 import { useState } from 'react';
 import { CheckCircle2, ClipboardList, FileText, Bell, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import type { MemoryInterpretationResponse } from '../services/api';
+import { CategorySelect } from './memories/CategorySelect';
 
 interface ActionCardProps {
   interpretation: MemoryInterpretationResponse['interpretation'];
   originalText?: string; // Texto original do usuário (para exibir colapsado)
   needsConfirmation?: boolean;
   interactionId?: string;
-  onConfirm?: (interactionId: string) => void;
+  onConfirm?: (interactionId: string, categoryId?: string) => void;
   onReject?: (interactionId: string) => void;
   isConfirming?: boolean;
 }
@@ -26,6 +27,7 @@ export function ActionCard({
   isConfirming = false,
 }: ActionCardProps) {
   const [showOriginalText, setShowOriginalText] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
 
   const getTypeInfo = () => {
     switch (interpretation.action_type) {
@@ -269,23 +271,38 @@ export function ActionCard({
         </div>
       </div>
       {showConfirmationButtons && (
-        <div className="mt-5 pt-5 border-t border-border/30 dark:border-border-dark/30 flex gap-3">
-          <button
-            onClick={() => onConfirm(interactionId)}
-            disabled={isConfirming}
-            className="flex-1 px-4 py-2.5 bg-blue-primary text-white rounded-xl text-sm hover:bg-blue-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-            style={{ fontWeight: 500 }}
-          >
-            {isConfirming ? 'Confirmando...' : 'Aceitar'}
-          </button>
-          <button
-            onClick={() => onReject(interactionId)}
-            disabled={isConfirming}
-            className="flex-1 px-4 py-2.5 bg-white dark:bg-surface-dark border border-border/50 dark:border-border-dark/50 text-text-secondary dark:text-text-secondary-dark rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ fontWeight: 500 }}
-          >
-            Cancelar
-          </button>
+        <div className="mt-5 pt-5 border-t border-border/30 dark:border-border-dark/30 space-y-3">
+          {/* Seletor de categoria */}
+          <div>
+            <label className="text-xs text-text-secondary/60 dark:text-text-secondary-dark/60 mb-2 block" style={{ fontWeight: 400 }}>
+              Categoria (opcional)
+            </label>
+            <CategorySelect
+              value={selectedCategoryId}
+              onValueChange={setSelectedCategoryId}
+              placeholder="Selecionar categoria..."
+            />
+          </div>
+          
+          {/* Botões de confirmação */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => onConfirm(interactionId, selectedCategoryId || undefined)}
+              disabled={isConfirming}
+              className="flex-1 px-4 py-2.5 bg-blue-primary text-white rounded-xl text-sm hover:bg-blue-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              style={{ fontWeight: 500 }}
+            >
+              {isConfirming ? 'Confirmando...' : 'Aceitar'}
+            </button>
+            <button
+              onClick={() => onReject(interactionId)}
+              disabled={isConfirming}
+              className="flex-1 px-4 py-2.5 bg-white dark:bg-surface-dark border border-border/50 dark:border-border-dark/50 text-text-secondary dark:text-text-secondary-dark rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ fontWeight: 500 }}
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
     </div>

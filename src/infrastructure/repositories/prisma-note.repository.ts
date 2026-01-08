@@ -17,6 +17,8 @@ export class PrismaNoteRepository implements NoteRepository {
         userId: note.userId,
         title: note.title,
         content: note.content,
+        isFavorite: note.isFavorite,
+        isPinned: note.isPinned,
       },
     });
 
@@ -26,6 +28,7 @@ export class PrismaNoteRepository implements NoteRepository {
   async findById(id: string): Promise<Note | null> {
     const found = await this.prisma.note.findUnique({
       where: { id },
+      include: { category: true },
     });
 
     if (!found) {
@@ -38,7 +41,11 @@ export class PrismaNoteRepository implements NoteRepository {
   async findByUserId(userId: string): Promise<Note[]> {
     const notes = await this.prisma.note.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      include: { category: true },
+      orderBy: [
+        { isPinned: 'desc' },
+        { createdAt: 'desc' },
+      ],
     });
 
     return notes.map((note) => this.mapToDomain(note));
@@ -50,6 +57,9 @@ export class PrismaNoteRepository implements NoteRepository {
       data: {
         title: note.title,
         content: note.content,
+        isFavorite: note.isFavorite,
+        isPinned: note.isPinned,
+        categoryId: (note as any).categoryId,
       },
     });
 
@@ -63,14 +73,20 @@ export class PrismaNoteRepository implements NoteRepository {
   }
 
   private mapToDomain(prismaNote: any): Note {
-    return Note.fromPersistence(
+    const note = Note.fromPersistence(
       prismaNote.id,
       prismaNote.userId,
       prismaNote.content,
       prismaNote.title,
+      prismaNote.isFavorite || false,
+      prismaNote.isPinned || false,
       prismaNote.createdAt ? new Date(prismaNote.createdAt) : undefined,
       prismaNote.updatedAt ? new Date(prismaNote.updatedAt) : undefined,
     );
+    // Adicionar categoryId e category como propriedades extras
+    (note as any).categoryId = prismaNote.categoryId;
+    (note as any).category = prismaNote.category;
+    return note;
   }
 }
 

@@ -13,6 +13,8 @@ export class Note {
     public readonly userId: string,
     public readonly content: string,
     public readonly title?: string,
+    public readonly isFavorite: boolean = false,
+    public readonly isPinned: boolean = false,
     public readonly createdAt?: Date,
     public readonly updatedAt?: Date,
   ) {
@@ -32,7 +34,7 @@ export class Note {
     content: string,
     title?: string,
   ): Note {
-    return new Note(id, userId, content, title, new Date(), new Date());
+    return new Note(id, userId, content, title, false, false, new Date(), new Date());
   }
 
   /**
@@ -44,10 +46,12 @@ export class Note {
     userId: string,
     content: string,
     title: string | undefined,
+    isFavorite: boolean,
+    isPinned: boolean,
     createdAt: Date | undefined,
     updatedAt: Date | undefined,
   ): Note {
-    return new Note(id, userId, content, title, createdAt, updatedAt);
+    return new Note(id, userId, content, title, isFavorite, isPinned, createdAt, updatedAt);
   }
 
   /**
@@ -98,6 +102,34 @@ export class Note {
       this.userId,
       newContent,
       newTitle,
+      this.isFavorite,
+      this.isPinned,
+      this.createdAt,
+      new Date(),
+    );
+  }
+
+  toggleFavorite(): Note {
+    return new Note(
+      this.id,
+      this.userId,
+      this.content,
+      this.title,
+      !this.isFavorite,
+      this.isPinned,
+      this.createdAt,
+      new Date(),
+    );
+  }
+
+  togglePin(): Note {
+    return new Note(
+      this.id,
+      this.userId,
+      this.content,
+      this.title,
+      this.isFavorite,
+      !this.isPinned,
       this.createdAt,
       new Date(),
     );

@@ -22,6 +22,8 @@ export class Task {
     public readonly completed: boolean = false,
     public readonly dueDate?: Date,
     public readonly priority?: TaskPriority,
+    public readonly isFavorite: boolean = false,
+    public readonly isPinned: boolean = false,
     public readonly createdAt?: Date,
     public readonly updatedAt?: Date,
     public readonly completedAt?: Date,
@@ -55,6 +57,8 @@ export class Task {
       false,
       dueDate,
       priority,
+      false, // isFavorite
+      false, // isPinned
       new Date(),
       new Date(),
     );
@@ -72,6 +76,8 @@ export class Task {
     completed: boolean,
     dueDate: Date | undefined,
     priority: TaskPriority | undefined,
+    isFavorite: boolean,
+    isPinned: boolean,
     createdAt: Date | undefined,
     updatedAt: Date | undefined,
     completedAt: Date | undefined,
@@ -84,6 +90,8 @@ export class Task {
       completed,
       dueDate,
       priority,
+      isFavorite,
+      isPinned,
       createdAt,
       updatedAt,
       completedAt,
@@ -151,6 +159,8 @@ export class Task {
       true,
       this.dueDate,
       this.priority,
+      this.isFavorite,
+      this.isPinned,
       this.createdAt,
       new Date(),
       new Date(),
@@ -174,6 +184,8 @@ export class Task {
       false,
       this.dueDate,
       this.priority,
+      this.isFavorite,
+      this.isPinned,
       this.createdAt,
       new Date(),
     );
@@ -200,6 +212,42 @@ export class Task {
       this.completed,
       dueDate !== undefined ? dueDate : this.dueDate,
       priority !== undefined ? priority : this.priority,
+      this.isFavorite,
+      this.isPinned,
+      this.createdAt,
+      new Date(),
+      this.completedAt,
+    );
+  }
+
+  toggleFavorite(): Task {
+    return new Task(
+      this.id,
+      this.userId,
+      this.title,
+      this.description,
+      this.completed,
+      this.dueDate,
+      this.priority,
+      !this.isFavorite,
+      this.isPinned,
+      this.createdAt,
+      new Date(),
+      this.completedAt,
+    );
+  }
+
+  togglePin(): Task {
+    return new Task(
+      this.id,
+      this.userId,
+      this.title,
+      this.description,
+      this.completed,
+      this.dueDate,
+      this.priority,
+      this.isFavorite,
+      !this.isPinned,
       this.createdAt,
       new Date(),
       this.completedAt,

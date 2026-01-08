@@ -37,5 +37,10 @@ export interface ReminderRepository {
    * Remove um lembrete
    */
   delete(id: string): Promise<void>;
+
+  /**
+   * Busca lembretes vencidos
+   */
+  findOverdueReminders(now: Date): Promise<Reminder[]>;
 }
 

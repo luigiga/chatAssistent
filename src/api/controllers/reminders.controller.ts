@@ -18,6 +18,7 @@ import { ListRemindersUseCase } from '@application/use-cases/reminders/list-remi
 import { UpdateReminderUseCase } from '@application/use-cases/reminders/update-reminder.use-case';
 import { DeleteReminderUseCase } from '@application/use-cases/reminders/delete-reminder.use-case';
 import { CompleteReminderUseCase } from '@application/use-cases/reminders/complete-reminder.use-case';
+import { UndoneReminderUseCase } from '@application/use-cases/reminders/undone-reminder.use-case';
 import { CreateReminderDto, CreateReminderDtoSchema } from '@application/dto/create-reminder.dto';
 import { UpdateReminderDto, UpdateReminderDtoSchema } from '@application/dto/update-reminder.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
@@ -32,6 +33,7 @@ export class RemindersController {
     private readonly updateReminderUseCase: UpdateReminderUseCase,
     private readonly deleteReminderUseCase: DeleteReminderUseCase,
     private readonly completeReminderUseCase: CompleteReminderUseCase,
+    private readonly undoneReminderUseCase: UndoneReminderUseCase,
   ) {}
 
   @Post()
@@ -90,6 +92,15 @@ export class RemindersController {
     @Param('id') id: string,
   ) {
     const reminder = await this.completeReminderUseCase.execute(user.sub, id);
+    return this.mapToResponse(reminder);
+  }
+
+  @Patch(':id/undone')
+  async undone(
+    @CurrentUser() user: { sub: string },
+    @Param('id') id: string,
+  ) {
+    const reminder = await this.undoneReminderUseCase.execute(user.sub, id);
     return this.mapToResponse(reminder);
   }
 

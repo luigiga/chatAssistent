@@ -3,9 +3,9 @@
  * Extensão visual da memória do usuário - organização, calma e clareza
  * Modelo de Memory Spaces com navegação local
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Calendar, CalendarDays, Lightbulb, Repeat, Archive } from 'lucide-react';
+import { Sparkles, Calendar, CalendarDays, Lightbulb, Repeat, Archive, Bell, Star } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { MemoryEntry, ExtendedMemoryEntry } from '../components/MemoryTimeline';
 import { MemorySpaceCard, type MemorySpaceKey } from '../components/MemorySpaceCard';
@@ -14,9 +14,13 @@ import { MemoriesEmptyState } from '../components/MemoriesEmptyState';
 import { MemoryDetailSheet } from '../components/memories/MemoryDetailSheet';
 import type { MemoryFilters } from '../components/memories/types';
 import { useMemoryMetadata } from '../hooks/useMemoryMetadata';
+import { toggleFavorite, togglePin } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface MemoriesListPageProps {
   memories: MemoryEntry[];
+  onCompleteReminder?: (reminderId: string) => void;
+  onMemoryUpdate?: () => void;
 }
 
 interface MemorySpace {
@@ -147,8 +151,24 @@ function getMemoryPreview(memory: MemoryEntry): string | undefined {
 }
 
 /**
+ * Verifica se uma memória é um lembrete pendente
+ */
+function isReminder(memory: MemoryEntry): boolean {
+  if (memory.interpretation?.action_type !== 'reminder') {
+    return false;
+  }
+  if (memory.metadata?.completed === true) {
+    return false;
+  }
+  if (!memory.interpretation.reminder?.reminder_date) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Agrupa memórias em Memory Spaces com prioridades
- * Prioridade: Hoje > Esta semana > Rotina > Ideias > Mais antigas
+ * Prioridade: Hoje > Esta semana > Rotina > Ideias > Lembretes > Mais antigas
  */
 function groupMemoriesIntoSpaces(memories: MemoryEntry[]): MemorySpace[] {
   const now = new Date();
@@ -161,14 +181,28 @@ function groupMemoriesIntoSpaces(memories: MemoryEntry[]): MemorySpace[] {
     { spaceId: 'thisWeek', title: 'Esta semana', icon: CalendarDays, memories: [] },
     { spaceId: 'routine', title: 'Rotina', icon: Repeat, memories: [] },
     { spaceId: 'ideas', title: 'Ideias', icon: Lightbulb, memories: [] },
+    { spaceId: 'favorites', title: 'Favoritos', icon: Star, memories: [] },
+    { spaceId: 'reminders', title: 'Lembretes', icon: Bell, memories: [] },
     { spaceId: 'older', title: 'Mais antigas', icon: Archive, memories: [] },
   ];
 
-  // Ordenar memórias por data (mais recente primeiro)
-  const sorted = [...memories].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  // Ordenar memórias: pinned primeiro, depois por data (mais recente primeiro)
+  const sorted = [...memories].sort((a, b) => {
+    const aPinned = a.metadata?.isPinned || false;
+    const bPinned = b.metadata?.isPinned || false;
+    if (aPinned !== bPinned) {
+      return aPinned ? -1 : 1; // pinned primeiro
+    }
+    return b.timestamp.getTime() - a.timestamp.getTime();
+  });
 
   sorted.forEach((memory) => {
-    // Aplicar prioridades em ordem
+    // Verificar se é favorito primeiro
+    if (memory.metadata?.isFavorite) {
+      spaces[4].memories.push(memory); // Favoritos
+    }
+    
+    // Aplicar prioridades em ordem (memória pode estar em múltiplos espaços)
     if (isToday(memory)) {
       spaces[0].memories.push(memory);
     } else if (isThisWeek(memory)) {
@@ -177,8 +211,41 @@ function groupMemoriesIntoSpaces(memories: MemoryEntry[]): MemorySpace[] {
       spaces[2].memories.push(memory);
     } else if (isIdea(memory)) {
       spaces[3].memories.push(memory);
+    } else if (isReminder(memory)) {
+      spaces[5].memories.push(memory); // Lembretes agora é índice 5
     } else {
-      spaces[4].memories.push(memory);
+      spaces[6].memories.push(memory); // Mais antigas agora é índice 6
+    }
+  });
+
+  // Ordenar cada espaço: pinned primeiro, depois por data/reminderDate
+  spaces.forEach((space) => {
+    if (space.spaceId === 'reminders') {
+      // Lembretes: pinned primeiro, depois por reminderDate
+      space.memories.sort((a, b) => {
+        const aPinned = a.metadata?.isPinned || false;
+        const bPinned = b.metadata?.isPinned || false;
+        if (aPinned !== bPinned) {
+          return aPinned ? -1 : 1;
+        }
+        const dateA = a.interpretation?.reminder?.reminder_date
+          ? new Date(a.interpretation.reminder.reminder_date).getTime()
+          : 0;
+        const dateB = b.interpretation?.reminder?.reminder_date
+          ? new Date(b.interpretation.reminder.reminder_date).getTime()
+          : 0;
+        return dateA - dateB; // Ascendente (mais próximo primeiro)
+      });
+    } else {
+      // Outros espaços: pinned primeiro, depois por timestamp
+      space.memories.sort((a, b) => {
+        const aPinned = a.metadata?.isPinned || false;
+        const bPinned = b.metadata?.isPinned || false;
+        if (aPinned !== bPinned) {
+          return aPinned ? -1 : 1;
+        }
+        return b.timestamp.getTime() - a.timestamp.getTime();
+      });
     }
   });
 
@@ -192,8 +259,9 @@ function groupMemoriesIntoSpaces(memories: MemoryEntry[]): MemorySpace[] {
   return spaces;
 }
 
-export function MemoriesListPage({ memories }: MemoriesListPageProps) {
+export function MemoriesListPage({ memories, onCompleteReminder, onMemoryUpdate }: MemoriesListPageProps) {
   const { updateMetadata } = useMemoryMetadata();
+  const { accessToken, refreshAccessToken } = useAuth();
 
   // Filtrar apenas memórias do assistente (ações registradas)
   const actionMemories = useMemo(() => {
@@ -240,6 +308,28 @@ export function MemoriesListPage({ memories }: MemoriesListPageProps) {
     // Nota: title e body não são salvos no backend ainda, apenas localmente via metadados
     // Isso pode ser estendido no futuro para salvar no backend
   };
+
+  // Handler para toggle favorite
+  const handleToggleFavorite = useCallback(async (memoryId: string, type: 'task' | 'note' | 'reminder') => {
+    if (!accessToken || !onMemoryUpdate) return;
+    try {
+      await toggleFavorite(accessToken, memoryId, type, refreshAccessToken);
+      onMemoryUpdate(); // Trigger refetch
+    } catch (error) {
+      console.error('Erro ao alternar favorito:', error);
+    }
+  }, [accessToken, onMemoryUpdate, refreshAccessToken]);
+
+  // Handler para toggle pin
+  const handleTogglePin = useCallback(async (memoryId: string, type: 'task' | 'note' | 'reminder') => {
+    if (!accessToken || !onMemoryUpdate) return;
+    try {
+      await togglePin(accessToken, memoryId, type, refreshAccessToken);
+      onMemoryUpdate(); // Trigger refetch
+    } catch (error) {
+      console.error('Erro ao alternar fixar:', error);
+    }
+  }, [accessToken, onMemoryUpdate, refreshAccessToken]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background dark:bg-background-dark">
@@ -324,6 +414,7 @@ export function MemoriesListPage({ memories }: MemoriesListPageProps) {
               onFilterSheetOpenChange={setFilterSheetOpen}
               filters={filters}
               onFiltersChange={setFilters}
+              onCompleteReminder={onCompleteReminder}
             />
           )
         )}
@@ -335,6 +426,8 @@ export function MemoriesListPage({ memories }: MemoriesListPageProps) {
         open={detailSheetOpen}
         onOpenChange={setDetailSheetOpen}
         onUpdate={handleMemoryUpdate}
+        onToggleFavorite={handleToggleFavorite}
+        onTogglePin={handleTogglePin}
       />
     </div>
   );

@@ -1,0 +1,213 @@
+---
+alwaysApply: true
+---
+
+# .cursor/rules/frontend-premium.mdc
+
+# Lumeo — Frontend Premium Rules (iOS-like / Biblioteca Silenciosa)
+
+# Objetivo: impedir regressão para UI genérica e guiar o Agent a entregar UX premium.
+
+## 0) Escopo
+
+Estas regras valem para qualquer mudança de FRONTEND no Lumeo:
+
+- UI/UX, layout, componentes, animações, navegação interna
+- Refactors de componentes existentes
+- Implementações em Memórias, Capturar, Você, TabBar e Sheets
+
+Se uma regra conflitar com uma necessidade funcional, priorize:
+
+1. acessibilidade e usabilidade
+2. consistência visual do produto
+3. simplicidade de manutenção
+
+---
+
+## 1) Identidade do Produto
+
+O Lumeo **não** é:
+
+- task manager
+- feed de timeline
+- dashboard
+- CRUD / painel administrativo
+- “Notas com filtros”
+
+O Lumeo **é**:
+
+- um assistente de memória pessoal
+- um espaço calmo para aliviar carga mental
+- “capturar = fluxo” e “memórias = estrutura”
+
+### Modelos mentais obrigatórios
+
+- **Capturar = fluxo** (input protagonista, exemplos, resultado)
+- **Memórias = biblioteca silenciosa** (espaços mentais estáveis, drill-down)
+- **Detalhe = contemplação** (sheet editorial, observações como camadas)
+- **Filtros = discretos** (bottom sheet, nunca poluir tela base)
+
+---
+
+## 2) Stack Permitido (não inventar)
+
+Use apenas (prioridade nesta ordem):
+
+1. **TailwindCSS** (layout, spacing, tokens)
+2. **shadcn/ui** + **Radix UI** (primitives: Sheet/Dialog, Button, Input, Textarea, Select, Tabs, DropdownMenu)
+3. **lucide-react** (ícones)
+4. **framer-motion** (microinterações e transições suaves)
+5. **Magic UI** (opcional) — apenas blur/gradiente/shimmer **muito sutil**
+
+### Proibido
+
+- Material UI / MUI como base
+- UI kits que imponham estilo Material/Android
+- Emojis como elementos estruturais de UI (ok usar em texto livre, se fizer sentido)
+
+---
+
+## 3) Princípios Visuais (iOS-like premium)
+
+**Menos é mais**. Se houver dúvida entre adicionar ou remover, **REMOVER**.
+
+### Ritmo e respiro
+
+- Priorizar espaço em branco intencional
+- Evitar densidade “lista apertada”
+- Cards com padding generoso
+- Separação clara entre seções
+
+### Cards
+
+- Rounded grande (ex: rounded-2xl / rounded-3xl)
+- Shadow leve (shadow-sm) e bordas suaves
+- Evitar contornos duros e alto contraste
+- Não colocar muitos botões dentro de cards
+
+### Tipografia
+
+- Hierarquia clara:
+  - título (essência)
+  - preview (sussurro)
+  - metadados (quase invisíveis)
+- Evitar CAIXA ALTA e labels gritantes
+- Preferir Inter/system; Roboto tende a “Android vibe” (use com cuidado)
+
+### Cores
+
+- Azul apenas para estados ativos/primários
+- Neutros dominam a UI
+- Gradientes: **quase imperceptíveis** (nunca “demo/portfolio”)
+
+---
+
+## 4) Animações (sentidas, não vistas)
+
+Use animação só quando tiver **significado** (entrada de memória, transição de sheet, criação de observação).
+
+### Permitido (recomendado)
+
+- fade + slide leve (300–500ms)
+- press feedback scale 0.99 / 0.98
+- easing suave (ease-out)
+
+### Proibido
+
+- animações chamativas/repetitivas
+- bounce, overshoot exagerado, efeitos “gaming”
+- shimmer brilhante (se usar, muito discreto)
+
+---
+
+## 5) Regras Específicas — Memórias (Biblioteca Silenciosa)
+
+### Tela raiz Memórias
+
+- **NÃO** renderizar lista de memórias direto na raiz.
+- Renderizar **Memory Spaces** (Hoje, Esta semana, Ideias, Rotina, Mais antigas).
+- Cada Space é um “ambiente”, não um “botão”.
+- Contagem e preview são discretos (sussurro).
+
+### Sub-tela do Space
+
+- Pode listar memórias, mas com “cara de acervo”:
+  - agrupamento por dia/tempo quando possível
+  - grid suave no desktop (2 colunas), lista limpa no mobile
+- Nunca parecer feed infinito.
+
+### MemoryCard
+
+- Card deve parecer **artefato** (memória viva), não nota.
+- Mostrar indicador discreto de “camadas” (observações).
+- Sem badges gritantes (NOTA, IMPORTANTE etc).
+
+### Memory Detail (Sheet)
+
+- Abrir em **bottom sheet** (mobile), central (desktop)
+- Layout editorial: respiro, leitura confortável
+- Observações são “camadas de contexto”
+- Edit mode separado (viewMode vs editMode)
+- Inputs só aparecem no editMode
+
+### Filtros
+
+- Filtros sempre via **bottom sheet**
+- Nunca deixar painel de filtros fixo na tela
+- Chips minimalistas, limpar filtros discreto
+
+---
+
+## 6) Comportamento do Agent (anti-genérico)
+
+### Sempre fazer
+
+- Refatorar antes de duplicar
+- Limitar criação de novos componentes
+- Seguir componentes já existentes (AppHeader, TabBar, MemoryDetailSheet, FilterSheet etc.)
+- Priorizar consistência (tokens, spacing, radius, shadows)
+
+### Nunca fazer
+
+- Criar “nova arquitetura” do nada
+- Criar 10 componentes para uma mudança simples
+- Reescrever navegação global sem pedido explícito
+- Transformar telas em “listagem com filtros sempre visíveis”
+
+---
+
+## 7) Critérios de Aceite (checklist visual)
+
+Uma mudança só é “aceita” se:
+
+- Capturar e Memórias **não parecem a mesma tela**
+- Memórias (raiz) não parece menu/lista genérica
+- Sub-telas parecem acervo (biblioteca), não feed
+- Detalhe em sheet transmite calma e profundidade
+- Filtros existem mas **não poluem**
+- UI não parece Material UI nem “template de SaaS”
+- A experiência reduz ansiedade (silenciosa, organizada)
+
+---
+
+## 8) Template obrigatório de prompt (para tarefas de UI)
+
+Quando receber um prompt do usuário, o Agent deve pedir/usar:
+
+- Arquivos-alvo (onde mexer)
+- Limite de novos componentes (ex: máx 1–3)
+- Critério de aceite visual
+- “NÃO fazer” explícito
+
+---
+
+## 9) Em caso de dúvida
+
+Se houver dúvida entre:
+
+- adicionar elemento novo
+- melhorar hierarquia/spacing com o que já existe
+
+Escolher: **melhorar hierarquia/spacing**.
+
+FIM.

@@ -6,7 +6,7 @@
 import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 
-export type MemorySpaceKey = 'today' | 'thisWeek' | 'ideas' | 'routine' | 'older';
+export type MemorySpaceKey = 'today' | 'thisWeek' | 'ideas' | 'routine' | 'favorites' | 'reminders' | 'older';
 
 interface MemorySpaceCardProps {
   spaceId: MemorySpaceKey;

@@ -14,6 +14,7 @@ import { CreateReminderUseCase } from '../reminders/create-reminder.use-case';
 import { AIRateLimiter } from '@infrastructure/ai/ai-rate-limiter.service';
 import { AICacheService } from '@infrastructure/ai/ai-cache.service';
 import { CircuitBreakerService } from '@infrastructure/ai/circuit-breaker.service';
+import { DateHeuristicService } from '@infrastructure/ai/date-heuristic.service';
 import { Task, TaskPriority } from '@domain/entities/task.entity';
 import { Note } from '@domain/entities/note.entity';
 import { Reminder } from '@domain/entities/reminder.entity';
@@ -39,6 +40,7 @@ export class InterpretUseCase {
     private readonly rateLimiter: AIRateLimiter,
     private readonly aiCache: AICacheService,
     private readonly circuitBreaker: CircuitBreakerService,
+    private readonly dateHeuristic: DateHeuristicService,
   ) {}
 
   async execute(
@@ -135,6 +137,27 @@ export class InterpretUseCase {
         action_type: 'unknown' as const,
         confirmation_message: 'Erro ao processar sua solicitação. Pode tentar novamente?',
       };
+    }
+
+    // 5. Fallback heurístico: se IA não detectou data mas há data no texto
+    if (
+      (interpretation.action_type === 'unknown' || interpretation.action_type === 'note') &&
+      !interpretation.reminder?.reminder_date
+    ) {
+      const detectedDate = this.dateHeuristic.detectDateTime(dto.text);
+      if (detectedDate) {
+        // Forçar como lembrete se detectou data
+        interpretation = {
+          needs_confirmation: false,
+          action_type: 'reminder' as const,
+          reminder: {
+            title: dto.text.substring(0, 100), // Usar texto como título
+            description: dto.text.length > 100 ? dto.text.substring(100) : undefined,
+            reminder_date: detectedDate.toISOString(),
+            is_recurring: false,
+          },
+        };
+      }
     }
 
     // Converter resposta para JSON string

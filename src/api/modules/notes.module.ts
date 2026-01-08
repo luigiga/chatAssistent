@@ -31,7 +31,7 @@ import { AuthModule } from './auth.module';
     },
     PrismaService,
   ],
-  exports: [NOTE_REPOSITORY, CreateNoteUseCase],
+  exports: [NOTE_REPOSITORY, CreateNoteUseCase, ListNotesUseCase],
 })
 export class NotesModule {}
 

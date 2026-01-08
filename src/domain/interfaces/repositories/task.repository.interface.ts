@@ -40,5 +40,10 @@ export interface TaskRepository {
    * Remove uma tarefa
    */
   delete(id: string): Promise<void>;
+
+  /**
+   * Busca tarefas vencidas
+   */
+  findOverdueTasks(now: Date): Promise<Task[]>;
 }
 

@@ -4,7 +4,7 @@
  * Reutiliza MemoryListCard existente
  */
 import { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, SlidersHorizontal } from 'lucide-react';
 import type { MemoryEntry } from './MemoryTimeline';
 import { MemoryListCard } from './MemoryListCard';
@@ -72,6 +72,7 @@ interface MemorySpaceDetailProps {
   onFilterSheetOpenChange?: (open: boolean) => void;
   filters?: MemoryFilters;
   onFiltersChange?: (filters: MemoryFilters) => void;
+  onCompleteReminder?: (reminderId: string) => void;
 }
 
 export function MemorySpaceDetail({
@@ -84,6 +85,7 @@ export function MemorySpaceDetail({
   onFilterSheetOpenChange,
   filters = {},
   onFiltersChange,
+  onCompleteReminder,
 }: MemorySpaceDetailProps) {
   const { getMetadata } = useMemoryMetadata();
 
@@ -91,11 +93,15 @@ export function MemorySpaceDetail({
   const filteredMemories = useMemo(() => {
     let filtered = [...memories];
 
-    // Filtrar por categoria
+    // Filtrar por categoria (categoryId)
     if (filters.categories && filters.categories.length > 0) {
       filtered = filtered.filter((memory) => {
         const metadata = getMetadata(memory.id);
-        return metadata?.category && filters.categories?.includes(metadata.category);
+        if (!metadata?.category) return false;
+        // metadata.category pode ser string (categoryId ou nome antigo)
+        // filters.categories agora são categoryIds
+        const categoryValue = typeof metadata.category === 'string' ? metadata.category : undefined;
+        return categoryValue && filters.categories?.includes(categoryValue);
       });
     }
 
@@ -103,7 +109,8 @@ export function MemorySpaceDetail({
     if (filters.types && filters.types.length > 0) {
       filtered = filtered.filter((memory) => {
         const actionType = memory.interpretation?.action_type;
-        return actionType && filters.types?.includes(actionType);
+        if (!actionType || actionType === 'unknown') return false;
+        return filters.types?.includes(actionType as 'task' | 'note' | 'reminder');
       });
     }
 
@@ -192,13 +199,23 @@ export function MemorySpaceDetail({
                     
                     {/* Grid responsivo - acervo */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {group.memories.map((memory) => (
-                        <MemoryListCard 
-                          key={memory.id} 
-                          memory={memory} 
-                          onClick={onMemoryClick}
-                        />
-                      ))}
+                      <AnimatePresence mode="popLayout">
+                        {group.memories.map((memory) => (
+                          <motion.div
+                            key={memory.id}
+                            initial={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                            layout
+                          >
+                            <MemoryListCard 
+                              memory={memory} 
+                              onClick={onMemoryClick}
+                              onCompleteReminder={onCompleteReminder}
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
                     </div>
                   </div>
                 ))}

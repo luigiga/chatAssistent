@@ -13,19 +13,25 @@ import {
   Heart,
   CheckCircle2,
   ChevronRight,
+  Tag,
 } from 'lucide-react';
 import type { MemoryEntry } from '../components/MemoryTimeline';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { AppShell } from '../components/ui/AppShell';
 import { GlassCard } from '../components/ui/GlassCard';
+import { Switch } from '../components/ui/switch';
+import { useQuietHours } from '../hooks/useQuietHours';
 
 interface ProfilePageProps {
   user?: { name?: string; email: string };
   onLogout?: () => void;
   memories?: MemoryEntry[];
+  onNavigateToCategories?: () => void;
 }
 
-export function ProfilePage({ user, onLogout, memories = [] }: ProfilePageProps) {
+export function ProfilePage({ user, onLogout, memories = [], onNavigateToCategories }: ProfilePageProps) {
+  const { config, updateConfig } = useQuietHours();
+
   // Calcular estatísticas
   const stats = useMemo(() => {
     const totalMemories = memories.filter((m) => m.type === 'assistant' && m.interpretation).length;
@@ -110,20 +116,39 @@ export function ProfilePage({ user, onLogout, memories = [] }: ProfilePageProps)
             Preferências
           </h3>
           <GlassCard className="overflow-hidden divide-y divide-border/50 dark:divide-border-dark/50 p-0">
-            <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors group text-left">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-500 dark:text-purple-400">
-                  <Bell className="w-5 h-5" strokeWidth={2} />
+            <div className="w-full flex flex-col p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-500 dark:text-purple-400">
+                    <Bell className="w-5 h-5" strokeWidth={2} />
+                  </div>
+                  <span className="text-sm font-medium text-text-primary dark:text-text-primary-dark">
+                    Modo silencioso
+                  </span>
                 </div>
-                <span className="text-sm font-medium text-text-primary dark:text-text-primary-dark">
-                  Notificações
-                </span>
+                <Switch
+                  checked={config.enabled}
+                  onCheckedChange={(checked) => updateConfig({ enabled: checked })}
+                />
               </div>
-              <ChevronRight
-                className="w-5 h-5 text-text-secondary/40 dark:text-text-secondary-dark/40 group-hover:text-blue-primary transition-colors"
-                strokeWidth={2}
-              />
-            </button>
+              {config.enabled && (
+                <div className="flex items-center gap-3 pl-11">
+                  <input
+                    type="time"
+                    value={config.startTime}
+                    onChange={(e) => updateConfig({ startTime: e.target.value })}
+                    className="text-sm px-2 py-1.5 rounded-lg border border-border dark:border-border-dark bg-background dark:bg-background-dark text-text-primary dark:text-text-primary-dark focus:outline-none focus:ring-2 focus:ring-blue-primary/20"
+                  />
+                  <span className="text-xs text-text-secondary/60 dark:text-text-secondary-dark/60">até</span>
+                  <input
+                    type="time"
+                    value={config.endTime}
+                    onChange={(e) => updateConfig({ endTime: e.target.value })}
+                    className="text-sm px-2 py-1.5 rounded-lg border border-border dark:border-border-dark bg-background dark:bg-background-dark text-text-primary dark:text-text-primary-dark focus:outline-none focus:ring-2 focus:ring-blue-primary/20"
+                  />
+                </div>
+              )}
+            </div>
             <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors group text-left">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500 dark:text-blue-400">
@@ -154,6 +179,25 @@ export function ProfilePage({ user, onLogout, memories = [] }: ProfilePageProps)
               </div>
               <ThemeToggle />
             </div>
+            {onNavigateToCategories && (
+              <button
+                onClick={onNavigateToCategories}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors group text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center text-indigo-500 dark:text-indigo-400">
+                    <Tag className="w-5 h-5" strokeWidth={2} />
+                  </div>
+                  <span className="text-sm font-medium text-text-primary dark:text-text-primary-dark">
+                    Categorias
+                  </span>
+                </div>
+                <ChevronRight
+                  className="w-5 h-5 text-text-secondary/40 dark:text-text-secondary-dark/40 group-hover:text-blue-primary transition-colors"
+                  strokeWidth={2}
+                />
+              </button>
+            )}
           </GlassCard>
         </section>
 

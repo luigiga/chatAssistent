@@ -20,6 +20,9 @@ export class PrismaTaskRepository implements TaskRepository {
         completed: task.completed,
         dueDate: task.dueDate,
         priority: task.priority,
+        isFavorite: task.isFavorite,
+        isPinned: task.isPinned,
+        categoryId: (task as any).categoryId,
         completedAt: task.completedAt,
       },
     });
@@ -30,6 +33,7 @@ export class PrismaTaskRepository implements TaskRepository {
   async findById(id: string): Promise<Task | null> {
     const found = await this.prisma.task.findUnique({
       where: { id },
+      include: { category: true },
     });
 
     if (!found) {
@@ -42,7 +46,11 @@ export class PrismaTaskRepository implements TaskRepository {
   async findByUserId(userId: string): Promise<Task[]> {
     const tasks = await this.prisma.task.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      include: { category: true },
+      orderBy: [
+        { isPinned: 'desc' },
+        { createdAt: 'desc' },
+      ],
     });
 
     return tasks.map((task) => this.mapToDomain(task));
@@ -82,6 +90,9 @@ export class PrismaTaskRepository implements TaskRepository {
         completed: task.completed,
         dueDate: task.dueDate,
         priority: task.priority,
+        isFavorite: task.isFavorite,
+        isPinned: task.isPinned,
+        categoryId: (task as any).categoryId,
         completedAt: task.completedAt,
       },
     });
@@ -95,6 +106,18 @@ export class PrismaTaskRepository implements TaskRepository {
     });
   }
 
+  async findOverdueTasks(now: Date): Promise<Task[]> {
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        dueDate: { lte: now },
+        completed: false,
+      },
+      include: { category: true },
+    });
+
+    return tasks.map((task) => this.mapToDomain(task));
+  }
+
   private mapToDomain(prismaTask: any): Task {
     return Task.fromPersistence(
       prismaTask.id,
@@ -104,6 +127,8 @@ export class PrismaTaskRepository implements TaskRepository {
       prismaTask.completed,
       prismaTask.dueDate ? new Date(prismaTask.dueDate) : undefined,
       prismaTask.priority as TaskPriority | undefined,
+      prismaTask.isFavorite || false,
+      prismaTask.isPinned || false,
       prismaTask.createdAt ? new Date(prismaTask.createdAt) : undefined,
       prismaTask.updatedAt ? new Date(prismaTask.updatedAt) : undefined,
       prismaTask.completedAt ? new Date(prismaTask.completedAt) : undefined,

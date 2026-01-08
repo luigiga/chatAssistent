@@ -2,7 +2,7 @@
  * Glass Card - Card com efeito glass premium
  * Backdrop blur + background translúcido + border sutil + shadow suave
  */
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 interface GlassCardProps {

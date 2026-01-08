@@ -3,7 +3,7 @@
  * Visual iOS-like, limpo e organizado - Resumo premium, não nota crua
  */
 import { motion } from 'framer-motion';
-import { ClipboardList, FileText, Bell, Sparkles } from 'lucide-react';
+import { ClipboardList, FileText, Bell, Sparkles, Check, Star, Pin } from 'lucide-react';
 import type { MemoryInterpretationResponse } from '../services/api';
 import type { MemoryEntry } from './MemoryTimeline';
 import { useMemoryMetadata } from '../hooks/useMemoryMetadata';
@@ -12,6 +12,7 @@ interface MemoryListCardProps {
   memory: MemoryEntry;
   isNew?: boolean; // Indica se é uma memória recém-criada
   onClick?: (memory: MemoryEntry) => void;
+  onCompleteReminder?: (reminderId: string) => void;
 }
 
 function getTypeInfo(interpretation: MemoryInterpretationResponse['interpretation']) {
@@ -80,7 +81,7 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function MemoryListCard({ memory, isNew = false, onClick }: MemoryListCardProps) {
+export function MemoryListCard({ memory, isNew = false, onClick, onCompleteReminder }: MemoryListCardProps) {
   const { getMetadata } = useMemoryMetadata();
 
   if (!memory.interpretation) {
@@ -92,10 +93,20 @@ export function MemoryListCard({ memory, isNew = false, onClick }: MemoryListCar
   const timeStr = memory.timestamp ? formatTime(memory.timestamp) : '';
   const metadata = getMetadata(memory.id);
   const observationsCount = metadata?.observations?.length || 0;
+  const isReminder = memory.interpretation.action_type === 'reminder';
+  const isPendingReminder = isReminder && !memory.metadata?.completed;
+  const categoryId = metadata?.category; // categoryId (string) do metadata
 
   const handleClick = () => {
     if (onClick) {
       onClick(memory);
+    }
+  };
+
+  const handleComplete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onCompleteReminder && isPendingReminder) {
+      onCompleteReminder(memory.id);
     }
   };
 
@@ -127,33 +138,79 @@ export function MemoryListCard({ memory, isNew = false, onClick }: MemoryListCar
         )}
 
         {/* Metadados - quase invisíveis */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {timeStr && (
-            <span
-              className="text-[11px] text-text-secondary/20 dark:text-text-secondary-dark/20"
-              style={{ fontWeight: 400, letterSpacing: '0.02em' }}
-            >
-              {timeStr}
-            </span>
-          )}
-
-          {/* Indicador de profundidade - elegante */}
-          {observationsCount > 0 && (
-            <div className="flex items-center gap-1.5">
-              {/* Mini stack visual */}
-              <div className="flex items-end gap-0.5">
-                <div className="w-1 h-1 rounded-full bg-text-secondary/25 dark:bg-text-secondary-dark/25" />
-                <div className="w-1 h-1.5 rounded-full bg-text-secondary/30 dark:bg-text-secondary-dark/30" />
-                <div className="w-1 h-2 rounded-full bg-text-secondary/35 dark:bg-text-secondary-dark/35" />
-              </div>
-              {/* Texto elegante */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
+            {timeStr && (
               <span
-                className="text-[11px] text-text-secondary/35 dark:text-text-secondary-dark/35"
+                className="text-[11px] text-text-secondary/20 dark:text-text-secondary-dark/20"
                 style={{ fontWeight: 400, letterSpacing: '0.02em' }}
               >
-                {observationsCount} {observationsCount === 1 ? 'camada' : 'camadas'}
+                {timeStr}
               </span>
-            </div>
+            )}
+
+            {/* Indicador de profundidade - elegante */}
+            {observationsCount > 0 && (
+              <div className="flex items-center gap-1.5">
+                {/* Mini stack visual */}
+                <div className="flex items-end gap-0.5">
+                  <div className="w-1 h-1 rounded-full bg-text-secondary/25 dark:bg-text-secondary-dark/25" />
+                  <div className="w-1 h-1.5 rounded-full bg-text-secondary/30 dark:bg-text-secondary-dark/30" />
+                  <div className="w-1 h-2 rounded-full bg-text-secondary/35 dark:bg-text-secondary-dark/35" />
+                </div>
+                {/* Texto elegante */}
+                <span
+                  className="text-[11px] text-text-secondary/35 dark:text-text-secondary-dark/35"
+                  style={{ fontWeight: 400, letterSpacing: '0.02em' }}
+                >
+                  {observationsCount} {observationsCount === 1 ? 'camada' : 'camadas'}
+                </span>
+              </div>
+            )}
+
+            {/* Indicadores de favorito e pin - discretos */}
+            {metadata?.isFavorite && (
+              <Star className="w-3 h-3 text-yellow-400 fill-yellow-400 opacity-60" />
+            )}
+            {metadata?.isPinned && (
+              <Pin className="w-3 h-3 text-blue-primary fill-blue-primary opacity-60" />
+            )}
+            
+            {/* Indicador de categoria - discreto */}
+            {categoryId && (
+              <div
+                className="w-2 h-2 rounded-full opacity-40"
+                style={{ backgroundColor: '#3B82F6' }} // Cor padrão, pode ser melhorado depois buscando do backend
+                title="Categoria"
+              />
+            )}
+
+            {/* Data do lembrete se for reminder */}
+            {isReminder && memory.interpretation.reminder?.reminder_date && (
+              <span
+                className="text-[11px] text-text-secondary/30 dark:text-text-secondary-dark/30"
+                style={{ fontWeight: 400, letterSpacing: '0.02em' }}
+              >
+                {new Date(memory.interpretation.reminder.reminder_date).toLocaleDateString('pt-BR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
+            )}
+          </div>
+
+          {/* Botão de concluir para lembretes pendentes */}
+          {isPendingReminder && onCompleteReminder && (
+            <motion.button
+              onClick={handleComplete}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+              whileTap={{ scale: 0.95 }}
+              aria-label="Concluir lembrete"
+            >
+              <Check className="w-4 h-4" strokeWidth={2.5} />
+            </motion.button>
           )}
         </div>
       </div>

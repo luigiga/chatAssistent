@@ -4,20 +4,22 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Edit2, ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import { Edit2, ChevronDown, Plus, Star, Pin } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
+} from '../ui/sheet';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
+import { Input } from '../ui/input';
 import { CategorySelect } from './CategorySelect';
 import { GlassCard } from '../ui/GlassCard';
 import { ObservationItem } from './ObservationItem';
-import { useMemoryMetadata } from '@/hooks/useMemoryMetadata';
+import { useMemoryMetadata } from '../../hooks/useMemoryMetadata';
+import { setMemoryCategory } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import type { ExtendedMemoryEntry } from '../MemoryTimeline';
 
 interface MemoryDetailSheetProps {
@@ -25,6 +27,8 @@ interface MemoryDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdate: (memoryId: string, updates: Partial<{ category?: string; title?: string; body?: string }>) => void;
+  onToggleFavorite?: (memoryId: string, type: 'task' | 'note' | 'reminder') => Promise<void>;
+  onTogglePin?: (memoryId: string, type: 'task' | 'note' | 'reminder') => Promise<void>;
 }
 
 function getContent(interpretation: ExtendedMemoryEntry['interpretation']) {
@@ -65,8 +69,9 @@ function formatDateTime(date: Date): string {
   });
 }
 
-export function MemoryDetailSheet({ memory, open, onOpenChange, onUpdate }: MemoryDetailSheetProps) {
+export function MemoryDetailSheet({ memory, open, onOpenChange, onUpdate, onToggleFavorite, onTogglePin }: MemoryDetailSheetProps) {
   const { getMetadata, updateMetadata, addObservation } = useMemoryMetadata();
+  const { accessToken, refreshAccessToken } = useAuth();
   const [isEditMode, setIsEditMode] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editBody, setEditBody] = useState('');
@@ -97,13 +102,30 @@ export function MemoryDetailSheet({ memory, open, onOpenChange, onUpdate }: Memo
 
   const content = getContent(memory.interpretation);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     onUpdate(memory.id, {
       title: editTitle,
       body: editBody,
       category: editCategory || undefined,
     });
     updateMetadata(memory.id, { category: editCategory || undefined });
+    
+    // Salvar categoria no backend
+    if (accessToken && memory.interpretation?.action_type && memory.interpretation.action_type !== 'unknown') {
+      try {
+        await setMemoryCategory(
+          accessToken,
+          memory.id,
+          memory.interpretation.action_type as 'task' | 'note' | 'reminder',
+          editCategory || null,
+          refreshAccessToken,
+        );
+      } catch (error) {
+        // Erro ao salvar categoria não deve quebrar o fluxo
+        console.error('Erro ao salvar categoria no backend:', error);
+      }
+    }
+    
     setIsEditMode(false);
   };
 
@@ -152,14 +174,54 @@ export function MemoryDetailSheet({ memory, open, onOpenChange, onUpdate }: Memo
             </SheetTitle>
             <div className="flex items-center gap-2">
               {!isEditMode && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsEditMode(true)}
-                  className="h-8 w-8"
-                >
-                  <Edit2 className="h-4 w-4" />
-                </Button>
+                <>
+                  {/* Botão Favorito */}
+                  {onToggleFavorite && memory.interpretation && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={async () => {
+                        const type = memory.interpretation?.action_type;
+                        if (type && (type === 'task' || type === 'note' || type === 'reminder')) {
+                          await onToggleFavorite(memory.id, type);
+                        }
+                      }}
+                      className="h-8 w-8"
+                    >
+                      <Star 
+                        className={`h-4 w-4 ${memory.metadata?.isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-text-secondary/40'}`} 
+                      />
+                    </Button>
+                  )}
+                  
+                  {/* Botão Pin */}
+                  {onTogglePin && memory.interpretation && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={async () => {
+                        const type = memory.interpretation?.action_type;
+                        if (type && (type === 'task' || type === 'note' || type === 'reminder')) {
+                          await onTogglePin(memory.id, type);
+                        }
+                      }}
+                      className="h-8 w-8"
+                    >
+                      <Pin 
+                        className={`h-4 w-4 ${memory.metadata?.isPinned ? 'fill-blue-primary text-blue-primary' : 'text-text-secondary/40'}`} 
+                      />
+                    </Button>
+                  )}
+                  
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsEditMode(true)}
+                    className="h-8 w-8"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                </>
               )}
             </div>
           </div>

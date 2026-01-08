@@ -10,9 +10,10 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { useMemoryMetadata } from '@/hooks/useMemoryMetadata';
 import type { MemoryFilters } from './types';
 import { ClipboardList, FileText, Bell } from 'lucide-react';
+import { listCategories, type Category } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FilterSheetProps {
   open: boolean;
@@ -22,25 +23,43 @@ interface FilterSheetProps {
 }
 
 export function FilterSheet({ open, onOpenChange, filters, onFiltersChange }: FilterSheetProps) {
-  const { getCategories } = useMemoryMetadata();
+  const { accessToken, refreshAccessToken } = useAuth();
   const [localFilters, setLocalFilters] = useState<MemoryFilters>(filters);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
 
   useEffect(() => {
     setLocalFilters(filters);
   }, [filters]);
 
-  const categories = getCategories();
+  // Buscar categorias do backend quando o sheet abrir
+  useEffect(() => {
+    if (open && accessToken) {
+      const fetchCategories = async () => {
+        setIsLoadingCategories(true);
+        try {
+          const data = await listCategories(accessToken, refreshAccessToken);
+          setCategories(data);
+        } catch (error) {
+          console.error('Erro ao buscar categorias:', error);
+        } finally {
+          setIsLoadingCategories(false);
+        }
+      };
+      fetchCategories();
+    }
+  }, [open, accessToken, refreshAccessToken]);
   const types = [
     { value: 'task' as const, label: 'Tarefa', icon: ClipboardList },
     { value: 'note' as const, label: 'Nota', icon: FileText },
     { value: 'reminder' as const, label: 'Lembrete', icon: Bell },
   ];
 
-  const toggleCategory = (category: string) => {
+  const toggleCategory = (categoryId: string) => {
     const current = localFilters.categories || [];
-    const newCategories = current.includes(category)
-      ? current.filter((c) => c !== category)
-      : [...current, category];
+    const newCategories = current.includes(categoryId)
+      ? current.filter((c) => c !== categoryId)
+      : [...current, categoryId];
     setLocalFilters({ ...localFilters, categories: newCategories.length > 0 ? newCategories : undefined });
   };
 
@@ -93,24 +112,34 @@ export function FilterSheet({ open, onOpenChange, filters, onFiltersChange }: Fi
           {/* Categorias */}
           <div>
             <h3 className="text-sm font-medium mb-3 text-text-primary dark:text-text-primary-dark">Categoria</h3>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((category) => {
-                const isSelected = localFilters.categories?.includes(category);
-                return (
-                  <button
-                    key={category}
-                    onClick={() => toggleCategory(category)}
-                    className={`px-4 py-2 rounded-full text-sm transition-colors ${
-                      isSelected
-                        ? 'bg-blue-primary text-white'
-                        : 'bg-gray-100 dark:bg-gray-800 text-text-secondary dark:text-text-secondary-dark hover:bg-gray-200 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    {category}
-                  </button>
-                );
-              })}
-            </div>
+            {isLoadingCategories ? (
+              <p className="text-sm text-text-secondary/60 dark:text-text-secondary-dark/60">Carregando categorias...</p>
+            ) : categories.length === 0 ? (
+              <p className="text-sm text-text-secondary/60 dark:text-text-secondary-dark/60">Nenhuma categoria criada ainda</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {categories.map((category) => {
+                  const isSelected = localFilters.categories?.includes(category.id);
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => toggleCategory(category.id)}
+                      className={`px-4 py-2 rounded-full text-sm transition-colors flex items-center gap-2 ${
+                        isSelected
+                          ? 'bg-blue-primary text-white'
+                          : 'bg-gray-100 dark:bg-gray-800 text-text-secondary dark:text-text-secondary-dark hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <span>{category.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Tipos */}

@@ -1,101 +1,67 @@
 /**
  * Componente reutilizável para seleção de categoria
- * Permite selecionar categorias existentes ou criar novas
+ * Permite selecionar categorias existentes do backend
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { useMemoryMetadata } from '@/hooks/useMemoryMetadata';
+} from '../ui/select';
+import { listCategories, type Category } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface CategorySelectProps {
-  value?: string;
+  value?: string; // categoryId
   onValueChange: (value: string) => void;
   placeholder?: string;
 }
 
 export function CategorySelect({ value, onValueChange, placeholder = 'Selecionar categoria...' }: CategorySelectProps) {
-  const { getCategories, addCategory } = useMemoryMetadata();
-  const [isCreatingNew, setIsCreatingNew] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
+  const { accessToken, refreshAccessToken } = useAuth();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const categories = getCategories();
+  useEffect(() => {
+    const fetchCategories = async () => {
+      if (!accessToken) return;
+      setIsLoading(true);
+      try {
+        const data = await listCategories(accessToken, refreshAccessToken);
+        setCategories(data);
+      } catch (error) {
+        console.error('Erro ao buscar categorias:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchCategories();
+  }, [accessToken, refreshAccessToken]);
 
   const handleSelectChange = (selectedValue: string) => {
-    if (selectedValue === '__create_new__') {
-      setIsCreatingNew(true);
-    } else {
-      onValueChange(selectedValue);
-    }
+    onValueChange(selectedValue === 'none' ? '' : selectedValue);
   };
-
-  const handleCreateCategory = () => {
-    if (newCategoryName.trim()) {
-      addCategory(newCategoryName.trim());
-      onValueChange(newCategoryName.trim());
-      setIsCreatingNew(false);
-      setNewCategoryName('');
-    }
-  };
-
-  const handleCancelCreate = () => {
-    setIsCreatingNew(false);
-    setNewCategoryName('');
-  };
-
-  if (isCreatingNew) {
-    return (
-      <div className="space-y-2">
-        <Input
-          placeholder="Nome da categoria..."
-          value={newCategoryName}
-          onChange={(e) => setNewCategoryName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleCreateCategory();
-            } else if (e.key === 'Escape') {
-              handleCancelCreate();
-            }
-          }}
-          autoFocus
-        />
-        <div className="flex gap-2">
-          <button
-            onClick={handleCreateCategory}
-            className="px-3 py-1.5 text-sm bg-blue-primary text-white rounded-md hover:bg-blue-primary/90 transition-colors"
-          >
-            Criar
-          </button>
-          <button
-            onClick={handleCancelCreate}
-            className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <Select value={value || ''} onValueChange={handleSelectChange}>
+    <Select value={value || 'none'} onValueChange={handleSelectChange}>
       <SelectTrigger className="w-full">
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={isLoading ? 'Carregando...' : placeholder} />
       </SelectTrigger>
       <SelectContent>
+        <SelectItem value="none">Sem categoria</SelectItem>
         {categories.map((category) => (
-          <SelectItem key={category} value={category}>
-            {category}
+          <SelectItem key={category.id} value={category.id}>
+            <div className="flex items-center gap-2">
+              <div
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{ backgroundColor: category.color }}
+              />
+              <span>{category.name}</span>
+            </div>
           </SelectItem>
         ))}
-        <SelectItem value="__create_new__" className="text-blue-primary">
-          + Criar nova categoria...
-        </SelectItem>
       </SelectContent>
     </Select>
   );

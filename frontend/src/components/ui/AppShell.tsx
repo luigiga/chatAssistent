@@ -2,7 +2,7 @@
  * App Shell - Container principal premium
  * Define background consistente, container com max-width e ritmo vertical
  */
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 interface AppShellProps {

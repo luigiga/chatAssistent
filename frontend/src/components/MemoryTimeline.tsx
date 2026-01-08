@@ -20,6 +20,9 @@ export interface MemoryMetadata {
   category?: MemoryCategory | string;
   observations?: MemoryObservation[];
   isFavorite?: boolean;
+  isPinned?: boolean;
+  completed?: boolean;
+  completedAt?: Date;
 }
 
 export interface MemoryEntry {
